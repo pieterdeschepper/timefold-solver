@@ -44,7 +44,7 @@ public interface ConstraintStreamFunctionalTest {
 
     void ifExists_1Join1Filter();
 
-    void ifExistsDoesNotIncludeNullVars();
+    void ifExistsDoesNotIncludeUnassigned();
 
     @Deprecated(forRemoval = true)
     void ifExistsIncludesNullVarsWithFrom();
@@ -59,7 +59,7 @@ public interface ConstraintStreamFunctionalTest {
 
     void ifNotExists_1Join1Filter();
 
-    void ifNotExistsDoesNotIncludeNullVars();
+    void ifNotExistsDoesNotIncludeUnassigned();
 
     @Deprecated(forRemoval = true)
     void ifNotExistsIncludesNullVarsWithFrom();
@@ -194,6 +194,10 @@ public interface ConstraintStreamFunctionalTest {
 
     void penalizeUnweighted();
 
+    void penalizeUnweightedLong();
+
+    void penalizeUnweightedBigDecimal();
+
     void penalize();
 
     void penalizeLong();
@@ -252,4 +256,7 @@ public interface ConstraintStreamFunctionalTest {
 
     void impactNegativeBigDecimalCustomJustifications();
 
+    void failWithMultipleJustifications();
+
+    void failWithMultipleIndictments();
 }

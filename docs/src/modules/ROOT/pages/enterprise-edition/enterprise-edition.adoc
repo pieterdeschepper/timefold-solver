@@ -101,10 +101,14 @@ This feature is a commercial feature of Timefold Solver Enterprise Edition.
 It is not available in the Community Edition.
 ====
 
-In some use cases (such as TSP and VRP, but also in non-chained variable cases),
-changing entities to nearby values or swapping nearby entities can *heavily increase scalability* and improve solution quality.
+In some use cases (such as TSP and VRP, but also in other cases),
+changing entities to nearby values or swapping nearby entities leads to better results faster.
 
 image::enterprise-edition/nearbySelectionMotivation.png[align="center"]
+
+This can *heavily increase scalability* and improve solution quality:
+
+image::enterprise-edition/nearbySelectionValueProposition.png[align="center"]
 
 Nearby selection increases the probability of selecting an entity or value which is nearby to the first entity being moved in that move.
 
@@ -145,7 +149,26 @@ The solver may choose to reuse them in different contexts.
 
 ==== Nearby selection with a list variable
 
-To configure nearby selection with a planning list variable,
+To quickly configure nearby selection with a planning list variable,
+add `nearbyDistanceMeterClass` element to your configuration file.
+
+[source,xml,options="nowrap"]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<solver xmlns="https://timefold.ai/xsd/solver">
+    ...
+    <nearbyDistanceMeterClass>ai.timefold.solver.examples.vehiclerouting.domain.solver.nearby.CustomerNearbyDistanceMeter</nearbyDistanceMeterClass>
+</solver>
+----
+
+By default, the following move selectors are included:
+xref:optimization-algorithms/optimization-algorithms.adoc#changeMoveSelector[Change],
+xref:optimization-algorithms/optimization-algorithms.adoc#swapMoveSelector[Swap],
+Change with Nearby,
+Swap with Nearby,
+and xref:optimization-algorithms/optimization-algorithms.adoc#kOptListMoveSelector[2-OPT] with Nearby.
+
+To customize the move selectors,
 add a `nearbySelection` element in the `destinationSelector`,`valueSelector` or `subListSelector`
 and use xref:optimization-algorithms/optimization-algorithms.adoc#mimicSelection[mimic selection] to specify which destination, value, or subList should be near by the selection.
 
@@ -199,7 +222,27 @@ and use xref:optimization-algorithms/optimization-algorithms.adoc#mimicSelection
 
 ==== Nearby selection with a chained variable
 
-To configure nearby selection with a chained planning variable, add a `nearbySelection` element in the `entitySelector` or `valueSelector`
+To quickly configure nearby selection with a chained planning variable,
+add `nearbyDistanceMeterClass` element to your configuration file.
+
+[source,xml,options="nowrap"]
+----
+<?xml version="1.0" encoding="UTF-8"?>
+<solver xmlns="https://timefold.ai/xsd/solver">
+    ...
+    <nearbyDistanceMeterClass>ai.timefold.solver.examples.vehiclerouting.domain.solver.nearby.CustomerNearbyDistanceMeter</nearbyDistanceMeterClass>
+</solver>
+----
+
+By default, the following move selectors are included:
+xref:optimization-algorithms/optimization-algorithms.adoc#changeMoveSelector[Change],
+xref:optimization-algorithms/optimization-algorithms.adoc#swapMoveSelector[Swap],
+Change with Nearby,
+Swap with Nearby,
+and xref:optimization-algorithms/optimization-algorithms.adoc#tailChainSwapMoveSelector[Tail Chain Swap] with Nearby.
+
+To customize the move selectors,
+add a `nearbySelection` element in the `entitySelector` or `valueSelector`
 and use <<mimicSelection,mimic selection>> to specify which entity should be near by the selection.
 
 [source,xml,options="nowrap"]

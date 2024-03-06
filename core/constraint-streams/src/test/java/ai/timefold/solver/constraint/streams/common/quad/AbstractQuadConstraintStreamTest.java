@@ -11,6 +11,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 import static java.util.function.Function.identity;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
@@ -309,7 +310,7 @@ public abstract class AbstractQuadConstraintStreamTest
     @Override
     @TestTemplate
     @Disabled("Would cause too many matches to meaningfully assert; cost-benefit ratio is wrong here.")
-    public void ifExistsDoesNotIncludeNullVars() {
+    public void ifExistsDoesNotIncludeUnassigned() {
 
     }
 
@@ -475,7 +476,7 @@ public abstract class AbstractQuadConstraintStreamTest
     @Override
     @TestTemplate
     @Disabled("Would cause too many matches to meaningfully assert; cost-benefit ratio is wrong here.")
-    public void ifNotExistsDoesNotIncludeNullVars() {
+    public void ifNotExistsDoesNotIncludeUnassigned() {
 
     }
 
@@ -2028,6 +2029,48 @@ public abstract class AbstractQuadConstraintStreamTest
         assertDefaultJustifications(scoreDirector, solution.getEntityList(), solution.getValueList());
     }
 
+    @Override
+    @TestTemplate
+    public void penalizeUnweightedLong() {
+        TestdataSimpleLongScoreSolution solution = TestdataSimpleLongScoreSolution.generateSolution();
+
+        InnerScoreDirector<TestdataSimpleLongScoreSolution, SimpleLongScore> scoreDirector = buildScoreDirector(
+                TestdataSimpleLongScoreSolution.buildSolutionDescriptor(),
+                factory -> new Constraint[] {
+                        factory.forEachUniquePair(TestdataEntity.class, equal(TestdataEntity::getValue))
+                                .join(TestdataValue.class, equal((entity, entity2) -> entity.getValue(), identity()))
+                                .join(TestdataValue.class, equal((entity, entity2, value) -> value, identity()))
+                                .penalizeLong(SimpleLongScore.ONE)
+                                .asConstraint(TEST_CONSTRAINT_NAME)
+                });
+
+        scoreDirector.setWorkingSolution(solution);
+        scoreDirector.calculateScore();
+        assertThat(scoreDirector.calculateScore()).isEqualTo(SimpleLongScore.of(-2));
+        assertDefaultJustifications(scoreDirector, solution.getEntityList(), solution.getValueList());
+    }
+
+    @Override
+    @TestTemplate
+    public void penalizeUnweightedBigDecimal() {
+        TestdataSimpleBigDecimalScoreSolution solution = TestdataSimpleBigDecimalScoreSolution.generateSolution();
+
+        InnerScoreDirector<TestdataSimpleBigDecimalScoreSolution, SimpleBigDecimalScore> scoreDirector =
+                buildScoreDirector(TestdataSimpleBigDecimalScoreSolution.buildSolutionDescriptor(),
+                        factory -> new Constraint[] {
+                                factory.forEachUniquePair(TestdataEntity.class, equal(TestdataEntity::getValue))
+                                        .join(TestdataValue.class, equal((entity, entity2) -> entity.getValue(), identity()))
+                                        .join(TestdataValue.class, equal((entity, entity2, value) -> value, identity()))
+                                        .penalizeBigDecimal(SimpleBigDecimalScore.ONE)
+                                        .asConstraint(TEST_CONSTRAINT_NAME)
+                        });
+
+        scoreDirector.setWorkingSolution(solution);
+        scoreDirector.calculateScore();
+        assertThat(scoreDirector.calculateScore()).isEqualTo(SimpleBigDecimalScore.of(BigDecimal.valueOf(-2)));
+        assertDefaultJustifications(scoreDirector, solution.getEntityList(), solution.getValueList());
+    }
+
     private <Score_ extends Score<Score_>, Solution_, Entity_, Value_> void assertDefaultJustifications(
             InnerScoreDirector<Solution_, Score_> scoreDirector, List<Entity_> entityList, List<Value_> valueList) {
         if (!implSupport.isConstreamMatchEnabled())
@@ -2716,6 +2759,36 @@ public abstract class AbstractQuadConstraintStreamTest
         scoreDirector.calculateScore();
         assertThat(scoreDirector.calculateScore()).isEqualTo(SimpleBigDecimalScore.of(BigDecimal.valueOf(-4)));
         assertCustomJustifications(scoreDirector, solution.getEntityList(), solution.getValueList());
+    }
+
+    @Override
+    @TestTemplate
+    public void failWithMultipleJustifications() {
+        assertThatCode(() -> buildScoreDirector(
+                factory -> factory.forEachUniquePair(TestdataLavishEntity.class, equal(TestdataLavishEntity::getValue))
+                        .join(TestdataLavishValue.class, equal((entity, entity2) -> entity.getValue(), identity()))
+                        .join(TestdataLavishValue.class, equal((entity, entity2, value) -> value, identity()))
+                        .penalize(SimpleScore.ONE, (entity, entity2, value, value2) -> 2)
+                        .justifyWith((a, b, c, d, score) -> new TestConstraintJustification<>(score, a, b, c, d))
+                        .justifyWith((a, b, c, d, score) -> new TestConstraintJustification<>(score, a, b, c, d))
+                        .indictWith(List::of)
+                        .asConstraint(TEST_CONSTRAINT_NAME)))
+                .hasMessageContaining("Maybe the constraint calls justifyWith() twice?");
+    }
+
+    @Override
+    @TestTemplate
+    public void failWithMultipleIndictments() {
+        assertThatCode(() -> buildScoreDirector(
+                factory -> factory.forEachUniquePair(TestdataLavishEntity.class, equal(TestdataLavishEntity::getValue))
+                        .join(TestdataLavishValue.class, equal((entity, entity2) -> entity.getValue(), identity()))
+                        .join(TestdataLavishValue.class, equal((entity, entity2, value) -> value, identity()))
+                        .penalize(SimpleScore.ONE, (entity, entity2, value, value2) -> 2)
+                        .justifyWith((a, b, c, d, score) -> new TestConstraintJustification<>(score, a, b, c, d))
+                        .indictWith(List::of)
+                        .indictWith(List::of)
+                        .asConstraint(TEST_CONSTRAINT_NAME)))
+                .hasMessageContaining("Maybe the constraint calls indictWith() twice?");
     }
 
 }
