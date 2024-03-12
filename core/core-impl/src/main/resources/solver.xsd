@@ -107,6 +107,8 @@
                     
           <xs:element minOccurs="0" name="constraintStreamImplType" type="tns:constraintStreamImplType"/>
                     
+          <xs:element minOccurs="0" name="constraintStreamAutomaticNodeSharing" type="xs:boolean"/>
+                    
           <xs:element minOccurs="0" name="incrementalScoreCalculatorClass" type="xs:string"/>
                     
           <xs:element minOccurs="0" name="incrementalScoreCalculatorCustomProperties" type="tns:jaxbAdaptedMap"/>
@@ -607,7 +609,7 @@
         
     <xs:complexContent>
             
-      <xs:extension base="tns:moveSelectorConfig">
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -623,11 +625,25 @@
       
   </xs:complexType>
     
-  <xs:complexType name="kOptListMoveSelectorConfig">
+  <xs:complexType abstract="true" name="nearbyAutoConfigurationMoveSelectorConfig">
         
     <xs:complexContent>
             
       <xs:extension base="tns:moveSelectorConfig">
+                
+        <xs:sequence/>
+              
+      </xs:extension>
+          
+    </xs:complexContent>
+      
+  </xs:complexType>
+    
+  <xs:complexType name="kOptListMoveSelectorConfig">
+        
+    <xs:complexContent>
+            
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -651,7 +667,7 @@
         
     <xs:complexContent>
             
-      <xs:extension base="tns:moveSelectorConfig">
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -693,7 +709,7 @@
         
     <xs:complexContent>
             
-      <xs:extension base="tns:moveSelectorConfig">
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -969,7 +985,7 @@
         
     <xs:complexContent>
             
-      <xs:extension base="tns:moveSelectorConfig">
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -1003,7 +1019,7 @@
         
     <xs:complexContent>
             
-      <xs:extension base="tns:moveSelectorConfig">
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -1023,7 +1039,7 @@
         
     <xs:complexContent>
             
-      <xs:extension base="tns:moveSelectorConfig">
+      <xs:extension base="tns:nearbyAutoConfigurationMoveSelectorConfig">
                 
         <xs:sequence>
                     
@@ -1509,11 +1525,19 @@
             
       <xs:enumeration value="ERROR_COUNT"/>
             
+      <xs:enumeration value="SCORE_CALCULATION_COUNT"/>
+            
+      <xs:enumeration value="PROBLEM_ENTITY_COUNT"/>
+            
+      <xs:enumeration value="PROBLEM_VARIABLE_COUNT"/>
+            
+      <xs:enumeration value="PROBLEM_VALUE_COUNT"/>
+            
+      <xs:enumeration value="PROBLEM_SIZE_LOG"/>
+            
       <xs:enumeration value="BEST_SCORE"/>
             
       <xs:enumeration value="STEP_SCORE"/>
-            
-      <xs:enumeration value="SCORE_CALCULATION_COUNT"/>
             
       <xs:enumeration value="BEST_SOLUTION_MUTATION"/>
             

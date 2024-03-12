@@ -518,6 +518,11 @@ public class SolverConfig extends AbstractConfig<SolverConfig> {
         return this;
     }
 
+    public SolverConfig withClassLoader(ClassLoader classLoader) {
+        this.setClassLoader(classLoader);
+        return this;
+    }
+
     /**
      * As defined by {@link ScoreDirectorFactoryConfig#withEasyScoreCalculatorClass(Class)}, but returns this.
      *
@@ -626,7 +631,9 @@ public class SolverConfig extends AbstractConfig<SolverConfig> {
     public MonitoringConfig determineMetricConfig() {
         return Objects.requireNonNullElse(monitoringConfig,
                 new MonitoringConfig().withSolverMetricList(Arrays.asList(SolverMetric.SOLVE_DURATION, SolverMetric.ERROR_COUNT,
-                        SolverMetric.SCORE_CALCULATION_COUNT)));
+                        SolverMetric.SCORE_CALCULATION_COUNT, SolverMetric.PROBLEM_ENTITY_COUNT,
+                        SolverMetric.PROBLEM_VARIABLE_COUNT, SolverMetric.PROBLEM_VALUE_COUNT,
+                        SolverMetric.PROBLEM_SIZE_LOG)));
     }
 
     // ************************************************************************

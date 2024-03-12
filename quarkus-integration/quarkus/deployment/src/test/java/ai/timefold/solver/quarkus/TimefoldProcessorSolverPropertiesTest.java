@@ -13,6 +13,7 @@ import ai.timefold.solver.core.api.score.buildin.simple.SimpleScore;
 import ai.timefold.solver.core.api.solver.SolverFactory;
 import ai.timefold.solver.core.config.solver.EnvironmentMode;
 import ai.timefold.solver.core.config.solver.SolverConfig;
+import ai.timefold.solver.quarkus.testdata.dummy.DummyDistanceMeter;
 import ai.timefold.solver.quarkus.testdata.normal.constraints.TestdataQuarkusConstraintProvider;
 import ai.timefold.solver.quarkus.testdata.normal.domain.TestdataQuarkusEntity;
 import ai.timefold.solver.quarkus.testdata.normal.domain.TestdataQuarkusSolution;
@@ -30,6 +31,8 @@ class TimefoldProcessorSolverPropertiesTest {
     static final QuarkusUnitTest config = new QuarkusUnitTest()
             .overrideConfigKey("quarkus.timefold.solver.environment-mode", "FULL_ASSERT")
             .overrideConfigKey("quarkus.timefold.solver.daemon", "true")
+            .overrideConfigKey("quarkus.timefold.solver.nearby-distance-meter-class",
+                    "ai.timefold.solver.quarkus.testdata.dummy.DummyDistanceMeter")
             .overrideConfigKey("quarkus.timefold.solver.move-thread-count", "2")
             .overrideConfigKey("quarkus.timefold.solver.domain-access-type", "REFLECTION")
             .overrideConfigKey("quarkus.timefold.solver.termination.spent-limit", "4h")
@@ -37,7 +40,7 @@ class TimefoldProcessorSolverPropertiesTest {
             .overrideConfigKey("quarkus.timefold.solver.termination.best-score-limit", "0")
             .setArchiveProducer(() -> ShrinkWrap.create(JavaArchive.class)
                     .addClasses(TestdataQuarkusEntity.class, TestdataQuarkusSolution.class,
-                            TestdataQuarkusConstraintProvider.class));
+                            TestdataQuarkusConstraintProvider.class, DummyDistanceMeter.class));
 
     @Inject
     SolverConfig solverConfig;
@@ -52,7 +55,7 @@ class TimefoldProcessorSolverPropertiesTest {
         assertEquals(DomainAccessType.REFLECTION, solverConfig.getDomainAccessType());
         assertEquals(null,
                 solverConfig.getScoreDirectorFactoryConfig().getConstraintStreamImplType());
-
+        assertNotNull(solverConfig.getNearbyDistanceMeterClass());
         assertNotNull(solverFactory);
     }
 

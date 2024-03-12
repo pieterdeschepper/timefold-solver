@@ -38,6 +38,7 @@ import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.SolverManagerConfig;
 import ai.timefold.solver.core.enterprise.TimefoldSolverEnterpriseService;
 import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
+import ai.timefold.solver.core.impl.heuristic.selector.common.nearby.NearbyDistanceMeter;
 import ai.timefold.solver.core.impl.score.director.ScoreDirectorFactoryService;
 import ai.timefold.solver.core.impl.score.stream.JoinerService;
 import ai.timefold.solver.quarkus.TimefoldRecorder;
@@ -574,7 +575,7 @@ class TimefoldProcessor {
         // Using the same name for synthetic beans is impossible, even if they are different types. Therefore, we allow
         // only the injection of SolverManager, except for the default solver, which can inject all resources to be
         // retro-compatible.
-        solverConfigBuildItem.getSolvetConfigMap().forEach((key, value) -> {
+        solverConfigBuildItem.getSolverConfigMap().forEach((key, value) -> {
             if (timefoldBuildTimeConfig.isDefaultSolverConfig(key)) {
                 // The two configuration resources are required for DefaultTimefoldBeanProvider produce all available
                 // managed beans for the default solver
@@ -634,7 +635,7 @@ class TimefoldProcessor {
             BuildProducer<SyntheticBeanBuildItem> syntheticBeans) {
         syntheticBeans.produce(SyntheticBeanBuildItem.configure(DevUISolverConfig.class)
                 .scope(ApplicationScoped.class)
-                .supplier(devUIRecorder.solverConfigSupplier(solverConfigBuildItem.getSolvetConfigMap(), runtimeConfig,
+                .supplier(devUIRecorder.solverConfigSupplier(solverConfigBuildItem.getSolverConfigMap(), runtimeConfig,
                         GizmoMemberAccessorEntityEnhancer.getGeneratedGizmoMemberAccessorMap(recorderContext,
                                 solverConfigBuildItem
                                         .getGeneratedGizmoClasses().generatedGizmoMemberAccessorClassSet),
@@ -719,6 +720,19 @@ class TimefoldProcessor {
         if (solverConfig.getDomainAccessType() == null) {
             solverConfig.setDomainAccessType(DomainAccessType.GIZMO);
         }
+
+        timefoldBuildTimeConfig.getSolverConfig(solverName)
+                .flatMap(SolverBuildTimeConfig::nearbyDistanceMeterClass)
+                .ifPresent(clazz -> {
+                    // We need to check the data type, as the Smallrye converter does not enforce it
+                    if (!NearbyDistanceMeter.class.isAssignableFrom(clazz)) {
+                        throw new IllegalArgumentException(
+                                "The Nearby Selection Meter class (%s) of the solver config (%s) does not implement NearbyDistanceMeter."
+                                        .formatted(clazz, solverName));
+                    }
+                    solverConfig.withNearbyDistanceMeterClass((Class<? extends NearbyDistanceMeter<?, ?>>) clazz);
+                });
+
         // Termination properties are set at runtime
     }
 
