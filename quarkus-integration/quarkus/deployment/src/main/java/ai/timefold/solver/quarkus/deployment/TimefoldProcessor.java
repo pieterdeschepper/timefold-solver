@@ -4,7 +4,6 @@ import static io.quarkus.deployment.annotations.ExecutionTime.RUNTIME_INIT;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 
-import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,7 +15,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Singleton;
@@ -36,11 +34,8 @@ import ai.timefold.solver.core.api.solver.SolverManager;
 import ai.timefold.solver.core.config.score.director.ScoreDirectorFactoryConfig;
 import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.SolverManagerConfig;
-import ai.timefold.solver.core.enterprise.TimefoldSolverEnterpriseService;
 import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import ai.timefold.solver.core.impl.heuristic.selector.common.nearby.NearbyDistanceMeter;
-import ai.timefold.solver.core.impl.score.director.ScoreDirectorFactoryService;
-import ai.timefold.solver.core.impl.score.stream.JoinerService;
 import ai.timefold.solver.quarkus.TimefoldRecorder;
 import ai.timefold.solver.quarkus.bean.DefaultTimefoldBeanProvider;
 import ai.timefold.solver.quarkus.bean.TimefoldSolverBannerBean;
@@ -83,10 +78,8 @@ import io.quarkus.deployment.builditem.GeneratedClassBuildItem;
 import io.quarkus.deployment.builditem.HotDeploymentWatchedFileBuildItem;
 import io.quarkus.deployment.builditem.IndexDependencyBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.ReflectiveHierarchyBuildItem;
-import io.quarkus.deployment.builditem.nativeimage.ServiceProviderBuildItem;
 import io.quarkus.deployment.pkg.steps.NativeBuild;
 import io.quarkus.deployment.recording.RecorderContext;
-import io.quarkus.deployment.util.ServiceUtil;
 import io.quarkus.devui.spi.JsonRPCProvidersBuildItem;
 import io.quarkus.devui.spi.page.CardPageBuildItem;
 import io.quarkus.devui.spi.page.Page;
@@ -107,27 +100,6 @@ class TimefoldProcessor {
     }
 
     @BuildStep
-    void registerSpi(BuildProducer<ServiceProviderBuildItem> services) {
-        Stream.of(ScoreDirectorFactoryService.class, JoinerService.class, TimefoldSolverEnterpriseService.class)
-                .forEach(service -> registerSpi(service, services));
-    }
-
-    private static void registerSpi(Class<?> serviceClass, BuildProducer<ServiceProviderBuildItem> services) {
-        String serviceName = serviceClass.getName();
-        String service = "META-INF/services/" + serviceName;
-        try {
-            // Find out all the provider implementation classes listed in the service files.
-            Set<String> implementationSet =
-                    ServiceUtil.classNamesNamedIn(Thread.currentThread().getContextClassLoader(), service);
-            // Register every listed implementation class, so they can be instantiated in native-image at run-time.
-            services.produce(new ServiceProviderBuildItem(serviceName, implementationSet.toArray(new String[0])));
-        } catch (IOException e) {
-            throw new IllegalStateException("Impossible state: Failed registering service " + serviceClass.getCanonicalName(),
-                    e);
-        }
-    }
-
-    @BuildStep
     void watchSolverConfigXml(BuildProducer<HotDeploymentWatchedFileBuildItem> hotDeploymentWatchedFiles) {
         String solverConfigXML = timefoldBuildTimeConfig.solverConfigXml()
                 .orElse(TimefoldBuildTimeConfig.DEFAULT_SOLVER_CONFIG_URL);
@@ -144,7 +116,7 @@ class TimefoldProcessor {
     @BuildStep
     IndexDependencyBuildItem indexDependencyBuildItem() {
         // Add @PlanningEntity and other annotations in the Jandex index for Gizmo
-        return new IndexDependencyBuildItem("ai.timefold.solver", "timefold-solver-core-impl");
+        return new IndexDependencyBuildItem("ai.timefold.solver", "timefold-solver-core");
     }
 
     @BuildStep(onlyIf = NativeBuild.class)
@@ -242,6 +214,7 @@ class TimefoldProcessor {
 
         // Step 2 - validate all SolverConfig definitions
         assertNoMemberAnnotationWithoutClassAnnotation(indexView);
+        assertNodeSharingDisabled(solverConfigMap);
         assertSolverConfigSolutionClasses(indexView, solverConfigMap);
         assertSolverConfigEntityClasses(indexView);
         assertSolverConfigConstraintClasses(indexView, solverConfigMap);
@@ -356,6 +329,22 @@ class TimefoldProcessor {
                 .map(AnnotationInstance::target)
                 .toList();
         assertTargetClasses(targetList, DotNames.PLANNING_SOLUTION);
+    }
+
+    private void assertNodeSharingDisabled(Map<String, SolverConfig> solverConfigMap) {
+        for (var entry : solverConfigMap.entrySet()) {
+            var solverConfig = entry.getValue();
+            if (solverConfig.getScoreDirectorFactoryConfig() != null &&
+                    Boolean.TRUE
+                            .equals(solverConfig.getScoreDirectorFactoryConfig().getConstraintStreamAutomaticNodeSharing())) {
+                throw new IllegalStateException("""
+                        SolverConfig %s enabled automatic node sharing via SolverConfig, which is not allowed.
+                        Enable automatic node sharing with the property %s instead."""
+                        .formatted(
+                                entry.getKey(),
+                                "quarkus.timefold.solver.constraint-stream-automatic-node-sharing=true"));
+            }
+        }
     }
 
     private void assertSolverConfigEntityClasses(IndexView indexView) {

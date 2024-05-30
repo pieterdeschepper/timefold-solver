@@ -133,7 +133,7 @@ which is stable enough to share with the employees, so they can plan their socia
 
 image::responding-to-change/continuousPlanningPatientAdmissionSchedule.png[align="center"]
 
-In the hospital bed planning example above, notice the difference between the original planning of November 1st and the new planning of November 5th:
+In the bed allocation scheduling example above, notice the difference between the original planning of November 1st and the new planning of November 5th:
 some problem facts (F, H, I, J, K) changed in the meantime, which results in unrelated planning entities (G) changing too.
 
 The planning window can be split up in several stages:
@@ -144,7 +144,8 @@ Immutable past time periods.
 It contains only pinned entities.
 +
 ** Recent historic entities can also affect score constraints that apply to movable entities.
-For example, in nurse rostering, a nurse that has worked the last three historic weekends in a row should not be assigned to three more weekends in a row, because she requires a one free weekend per month.
+For example, in employee rostering, an employee that has worked the last three historic weekends in a row
+should not be assigned to three more weekends in a row, because he requires a one free weekend per month.
 ** Do not load all historic entities in memory:
 even though pinned entities do not affect solving performance, they can cause out of memory problems when the data grows to years.
 Only load those that might still affect the current constraints with a good safety margin.
@@ -155,7 +156,8 @@ Upcoming time periods that have been published.
 They contain only <<pinnedPlanningEntities,pinned>> and/or <<nonvolatileReplanning,semi-movable>> planning entities.
 +
 ** The published schedule has been shared with the business.
-For example, in nurse rostering, the nurses will use this schedule to plan their personal lives, so they require a publish notice of for example 3 weeks in advance.
+For example, in employee rostering, the employees will use this schedule to plan their personal lives,
+so they require a publish notice of for example 3 weeks in advance.
 Normal planning will not change that part of schedule.
 +
 Changing that schedule later is disruptive, but were exceptions force us to do them anyway (for example someone calls in sick), do change this part of the planning while minimizing disruption with <<nonvolatileReplanning,non-disruptive replanning>>.
@@ -167,10 +169,11 @@ They contain movable planning entities, except for any that are pinned for other
 +
 ** The first part of the draft, called _the final draft_, will be published, so these planning entities can change one last time.
 The publishing frequency, for example once per week, determines the number of time periods that change from _draft_ to _published_.
-** The latter time periods of the _draft_ are likely change again in later planning efforts, especially if some of the problem facts change by then (for example nurse Ann doesn't want to work on one of those days).
+** The latter time periods of the _draft_ are likely change again in later planning efforts,
+especially if some of the problem facts change by then (for example employee Ann can't work on one of those days).
 +
 Despite that these latter planning entities might still change a lot, we can't leave them out for later, because we would risk _painting ourselves into a corner_.
-For example, in employee rostering we could have all our rare skilled employees working the last 5 days of the week that gets published,
+For example, in employee rostering, we could have all our rare skilled employees working the last 5 days of the week that gets published,
 which won't reduce the score of that week, but will make it impossible for us to deliver a feasible schedule the next week.
 So the draft length needs to be longer than the part that will be published first.
 ** That draft part is usually not shared with the business yet, because it is too volatile and it would only raise false expectations.
@@ -226,20 +229,19 @@ the lecture will not be assigned to another period or room (even if the current 
 Alternatively, to pin some planning entities down, add a `PinningFilter` that returns `true` if an entity is pinned, and `false` if it is movable.
 This is more flexible and more verbose than the `@PlanningPin` approach.
 
-For example on the nurse rostering example:
+For example, on the employee scheduling quickstart:
 
 . Add the `PinningFilter`:
 +
 [source,java,options="nowrap"]
 ----
-public class ShiftAssignmentPinningFilter implements PinningFilter<NurseRoster, ShiftAssignment> {
+public class ShiftPinningFilter implements PinningFilter<EmployeeSchedule, Shift> {
 
     @Override
-    public boolean accept(NurseRoster nurseRoster, ShiftAssignment shiftAssignment) {
-        ShiftDate shiftDate = shiftAssignment.getShift().getShiftDate();
-        return nurseRoster.getNurseRosterInfo().isInPlanningWindow(shiftDate);
+    public boolean accept(EmployeeSchedule employeeSchedule, Shift shift) {
+        ScheduleState scheduleState = employeeSchedule.getScheduleState();
+        return !scheduleState.isDraft(shift);
     }
-
 }
 ----
 
@@ -247,8 +249,8 @@ public class ShiftAssignmentPinningFilter implements PinningFilter<NurseRoster, 
 +
 [source,java,options="nowrap"]
 ----
-@PlanningEntity(pinningFilter = ShiftAssignmentPinningFilter.class)
-public class ShiftAssignment {
+@PlanningEntity(pinningFilter = ShiftPinningFilter.class)
+public class Shift {
     ...
 }
 ----
@@ -301,49 +303,46 @@ To pin the entire list, preventing any modifications to the list whatsoever,
 
 Replanning an existing plan can be very disruptive.
 If the plan affects humans (such as employees, drivers, ...), very disruptive changes are often undesirable.
-In such cases, nonvolatile replanning helps by restricting planning freedom: the gain of changing a plan must be higher than the disruption it causes.
+In such cases, nonvolatile replanning helps by restricting planning freedom:
+the gain of changing a plan must be higher than the disruption it causes.
 This is usually implemented by taxing all planning entities that change.
 
 image::responding-to-change/nonDisruptiveReplanning.png[align="center"]
 
-In the machine reassignment example, the entity has both the planning variable `machine` and its original value ``originalMachine``:
+In conference scheduling, the entity has both a planning variable `timeslot` and its original value ``publishedTimeslot``:
 
 [source,java,options="nowrap"]
 ----
-@PlanningEntity(...)
-public class ProcessAssignment {
+@PlanningEntity
+public class Talk {
 
-    private MrProcess process;
-    private Machine originalMachine;
-    private Machine machine;
+    ...
 
-    public Machine getOriginalMachine() {...}
+    @PlanningVariable
+    private Timeslot timeslot;
 
-    @PlanningVariable(...)
-    public Machine getMachine() {...}
-
-    public boolean isMoved() {
-        return originalMachine != null && originalMachine != machine;
-    }
+    private Timeslot publishedTimeslot;
 
     ...
 }
 ----
 
-During planning, the planning variable `machine` changes.
-By comparing it with the originalMachine, a change in plan can be penalized:
+During planning, the planning variable `timeslot` changes.
+By writing a constraint comparing it with the `publishedTimeslot`, a change in plan can be penalized:
 
-[source,options="nowrap"]
+[source,java,options="nowrap"]
 ----
-rule "processMoved"
-    when
-        ProcessAssignment(moved == true)
-    then
-        scoreHolder.addSoftConstraintMatch(kcontext, -1000);
-end
+    Constraint publishedTimeslot(ConstraintFactory factory) {
+        return factory.forEach(Talk.class)
+                .filter(talk -> talk.getPublishedTimeslot() != null
+                        && talk.getTimeslot() != talk.getPublishedTimeslot())
+                .penalizeConfigurable()
+                .asConstraint("Published timeslot");
+    }
 ----
 
-The soft penalty of `-1000` means that a better solution is only accepted if it improves the soft score for at least `1000` points per variable changed (or if it improves the hard score).
+By configuring a penalty weight of `-1000` we can express that a solution will only be accepted
+if it improves the soft score for at least `1000` points per variable changed (or if it improves the hard score).
 
 
 [#realTimePlanning]
@@ -453,35 +452,7 @@ Usually it reuses the same instances of the problem facts and problem fact colle
 * The clone must use different, cloned instances of the entities and entity collections.
 Changes to an original Solution entity’s variables must not affect its clone.
 
-[#problemChangeExample]
-==== Cloud balancing `ProblemChange` example
-
-Consider the following example of a `ProblemChange` implementation in the cloud balancing use case:
-
-[source,java,options="nowrap"]
-----
-    public void deleteComputer(final CloudComputer computer) {
-        solver.addProblemChange((cloudBalance, problemChangeDirector) -> {
-            CloudComputer workingComputer = problemChangeDirector.lookUpWorkingObject(computer);
-            if (workingComputer == null) {
-                throw new IllegalStateException("A computer " + computer + " does not exist. Maybe it has been already deleted.");
-            }
-            // First remove the problem fact from all planning entities that use it
-            for (CloudProcess process : cloudBalance.getProcessList()) {
-                if (process.getComputer() == workingComputer) {
-                    problemChangeDirector.changeVariable(process, "computer",
-                            workingProcess -> workingProcess.setComputer(null));
-                }
-            }
-            // A SolutionCloner does not clone problem fact lists (such as computerList)
-            // Shallow clone the computerList so only workingSolution is affected, not bestSolution or guiSolution
-            ArrayList<CloudComputer> computerList = new ArrayList<>(cloudBalance.getComputerList());
-            cloudBalance.setComputerList(computerList);
-            // Remove the problem fact itself
-            problemChangeDirector.removeProblemFact(workingComputer, computerList::remove);
-        });
-    }
-----
+When implementing problem changes, consider the following:
 
 . Any change in a `ProblemChange` must be done on the `@PlanningSolution` instance of ``scoreDirector.getWorkingSolution()``.
 
@@ -492,7 +463,7 @@ Consider the following example of a `ProblemChange` implementation in the cloud 
 Thus, any change on the planning entities must happen on the `workingSolution` instance passed to the `ProblemChange.doChange(Solution_ workingSolution, ProblemChangeDirector problemChangeDirector)` method.
 
 . Use the method `ProblemChangeDirector.lookUpWorkingObject()` to translate and retrieve the working solution's instance of an object.
-This requires xref:optimization-algorithms/optimization-algorithms.adoc#planningId[annotating a property of that class as the @PlanningId].
+This requires xref:using-timefold-solver/modeling-planning-problems.adoc#planningId[annotating a property of that class as the @PlanningId].
 
 . A planning clone does not clone the problem facts, nor the problem fact collections.
 _Therefore the ``__workingSolution__`` and the ``__bestSolution__`` share the same problem fact instances and the same problem fact list instances._
@@ -560,13 +531,14 @@ Do not forget to call `Solver.terminateEarly()` when your application needs to s
 
 . Subscribe to the `xref:optimization-algorithms/optimization-algorithms.adoc#SolverEventListener[BestSolutionChangedEvent]` to process new best solutions found by the solver thread.
 +
-A `BestSolutionChangedEvent` does not guarantee that every `ProblemChange` has been processed already, nor that the solution is initialized and feasible.
+A `BestSolutionChangedEvent` does not guarantee that every `ProblemChange` has been processed already,
+nor that the solution is initialized and feasible.
 
 . To ignore ``BestSolutionChangedEvent``s with such invalid solutions, do the following:
 +
 [source,java,options="nowrap"]
 ----
-    public void bestSolutionChanged(BestSolutionChangedEvent<CloudBalance> event) {
+    public void bestSolutionChanged(BestSolutionChangedEvent<VehicleRoutePlain> event) {
         if (event.isEveryProblemChangeProcessed()
                 // Ignore infeasible (including uninitialized) solutions
                 && event.getNewBestSolution().getScore().isFeasible()) {
@@ -575,7 +547,8 @@ A `BestSolutionChangedEvent` does not guarantee that every `ProblemChange` has b
     }
 ----
 
-. Use `Score.isSolutionInitialized()` instead of `Score.isFeasible()` to only ignore uninitialized solutions, but do accept infeasible solutions too.
+. Use `Score.isSolutionInitialized()` instead of `Score.isFeasible()` to only ignore uninitialized solutions,
+but do accept infeasible solutions too.
 
 
 [#recommendedFitAPI]
@@ -610,25 +583,25 @@ The Recommended Fit API requires one uninitialized entity to be present in the s
 
 [source,java,options="nowrap"]
 ----
-NurseRoster nurseRoster = ...; // Our planning solution.
-ShiftAssignment unassignedShift = new ShiftAssignment(...); // A new shift needs to be assigned.
-nurseRoster.getShiftAssignmentList().add(unassignedShift);
+EmployeeSchedule employeeSchedule = ...; // Our planning solution.
+Shift unassignedShift = new Shift(...); // A new shift needs to be assigned.
+employeeSchedule.getShifts().add(unassignedShift);
 ----
 
 The `SolutionManager` is then used to retrieve the recommended fit for the uninitialized entity:
 
 [source,java,options="nowrap"]
 ----
-SolutionManager<NurseRoster, HardSoftScore> solutionManager = ...;
+SolutionManager<EmployeeSchedule, HardSoftScore> solutionManager = ...;
 List<RecommendedFit<Employee, HardSoftScore>> recommendations =
-    solutionManager.recommendFit(nurseRoster, unassignedShift, ShiftAssignment::getEmployee);
+    solutionManager.recommendFit(employeeSchedule, unassignedShift, Shift::getEmployee);
 ----
 
 Breaking this down, we have:
 
-- `nurseRoster`, the planning solution.
+- `employeeSchedule`, the planning solution.
 - `unassignedShift`, the uninitialized entity, which is part of the planning solution.
-- `ShiftAssignment::getEmployee`, a function extracting the planning variable from the entity,
+- `Shift::getEmployee`, a function extracting the planning variable from the entity,
 also called a "proposition function".
 - `List<RecommendedFit<Employee, HardSoftScore>>`, the list of recommended employees to assign to the shift,
 in the order of decreasing preference.
@@ -685,12 +658,12 @@ Consider the following example:
 
 [source,java,options="nowrap"]
 ----
-SolutionManager<NurseRoster, HardSoftScore> solutionManager = ...;
-List<RecommendedFit<Employee, HardSoftScore>> recommendations =
-    solutionManager.recommendFit(nurseRoster, unassignedShift, shift -> shift);
+SolutionManager<EmployeeSchedule, HardSoftScore> solutionManager = ...;
+List<RecommendedFit<Shift, HardSoftScore>> recommendations =
+    solutionManager.recommendFit(employeeSchedule, unassignedShift, shift -> shift);
 ----
 
-The proposition function (`shift -> shift`) returns the entire `ShiftAssignment` entity.
+The proposition function (`shift -> shift`) returns the entire `Shift` entity.
 Because of the behavior described above,
 every `RecommendedFit` in the `recommendations` list will point to the same `unassignedShift`,
 and its `employee` variable will be `null`.
