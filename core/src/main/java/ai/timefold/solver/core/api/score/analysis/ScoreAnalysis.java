@@ -1,5 +1,7 @@
 package ai.timefold.solver.core.api.score.analysis;
 
+import static java.util.Comparator.comparing;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -53,6 +55,8 @@ import ai.timefold.solver.core.api.solver.SolutionManager;
 public record ScoreAnalysis<Score_ extends Score<Score_>>(Score_ score,
         Map<ConstraintRef, ConstraintAnalysis<Score_>> constraintMap) {
 
+    static final int DEFAULT_SUMMARY_CONSTRAINT_MATCH_LIMIT = 3;
+
     public ScoreAnalysis {
         Objects.requireNonNull(score, "score");
         Objects.requireNonNull(constraintMap, "constraintMap");
@@ -88,9 +92,39 @@ public record ScoreAnalysis<Score_ extends Score<Score_>>(Score_ score,
      * @param constraintPackage never null
      * @param constraintName never null
      * @return null if no constraint matches of such constraint are present
+     * @deprecated Use {@link #getConstraintAnalysis(String)} instead.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     public ConstraintAnalysis<Score_> getConstraintAnalysis(String constraintPackage, String constraintName) {
         return getConstraintAnalysis(ConstraintRef.of(constraintPackage, constraintName));
+    }
+
+    /**
+     * As defined by {@link #getConstraintAnalysis(ConstraintRef)}.
+     *
+     * @param constraintName never null
+     * @return null if no constraint matches of such constraint are present
+     * @throws IllegalStateException if multiple constraints with the same name are present,
+     *         which is possible if they are in different constraint packages.
+     *         Constraint packages are deprecated, we recommend avoiding them and instead naming constraints uniquely.
+     *         If you must use constraint packages, see {@link #getConstraintAnalysis(String, String)}
+     *         (also deprecated) and reach out to us to discuss your use case.
+     */
+    public ConstraintAnalysis<Score_> getConstraintAnalysis(String constraintName) {
+        var constraintAnalysisList = constraintMap.entrySet()
+                .stream()
+                .filter(entry -> entry.getKey().constraintName().equals(constraintName))
+                .map(Map.Entry::getValue)
+                .toList();
+        return switch (constraintAnalysisList.size()) {
+            case 0 -> null;
+            case 1 -> constraintAnalysisList.get(0);
+            default -> throw new IllegalStateException("""
+                    Multiple constraints with the same name (%s) are present in the score analysis.
+                    This may be caused by the use of multiple constraint packages, a deprecated feature.
+                    Please avoid using constraint packages and keep constraint names unique."""
+                    .formatted(constraintName));
+        };
     }
 
     /**
@@ -141,4 +175,70 @@ public record ScoreAnalysis<Score_ extends Score<Score_>>(Score_ score,
         return constraintMap.values();
     }
 
+    /**
+     * Returns a diagnostic text that explains the solution through the {@link ConstraintAnalysis} API to identify which
+     * constraints cause that score quality.
+     * The string is built fresh every time the method is called.
+     * <p>
+     * In case of an {@link Score#isFeasible() infeasible} solution, this can help diagnose the cause of that.
+     *
+     * <p>
+     * Do not parse the return value, its format may change without warning.
+     * Instead, provide this information in a UI or a service,
+     * use {@link ScoreAnalysis#constraintAnalyses()}
+     * and convert those into a domain-specific API.
+     *
+     * @return never null
+     */
+    @SuppressWarnings("java:S3457")
+    public String summarize() {
+        StringBuilder summary = new StringBuilder();
+        summary.append("""
+                Explanation of score (%s):
+                    Constraint matches:
+                """.formatted(score));
+        Comparator<ConstraintAnalysis<Score_>> constraintsScoreComparator = comparing(ConstraintAnalysis::score);
+        Comparator<MatchAnalysis<Score_>> matchScoreComparator = comparing(MatchAnalysis::score);
+
+        constraintAnalyses().stream()
+                .sorted(constraintsScoreComparator)
+                .forEach(constraint -> {
+                    var matches = constraint.matches();
+                    if (matches == null) {
+                        throw new IllegalArgumentException("""
+                                The constraint matches must be non-null.
+                                Maybe use ScoreAnalysisFetchPolicy.FETCH_ALL to request the score analysis
+                                """);
+                    }
+                    if (matches.isEmpty()) {
+                        summary.append(
+                                "%8s%s: constraint (%s) has no matches.\n".formatted(" ", constraint.score().toShortString(),
+                                        constraint.constraintRef().constraintName()));
+                    } else {
+                        summary.append(
+                                "%8s%s: constraint (%s) has %s matches:\n".formatted(" ", constraint.score().toShortString(),
+                                        constraint.constraintRef().constraintName(), matches.size()));
+                    }
+                    matches.stream()
+                            .sorted(matchScoreComparator)
+                            .limit(DEFAULT_SUMMARY_CONSTRAINT_MATCH_LIMIT)
+                            .forEach(match -> summary
+                                    .append("%12s%s: justified with (%s)\n".formatted(" ", match.score().toShortString(),
+                                            match.justification())));
+                    if (matches.size() > DEFAULT_SUMMARY_CONSTRAINT_MATCH_LIMIT) {
+                        summary.append("%12s%s\n".formatted(" ", "..."));
+                    }
+                });
+
+        return summary.toString();
+    }
+
+    public boolean isSolutionInitialized() {
+        return score().isSolutionInitialized();
+    }
+
+    @Override
+    public String toString() {
+        return "Score analysis of score %s with %d constraints.".formatted(score, constraintMap.size());
+    }
 }

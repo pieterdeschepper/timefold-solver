@@ -23,6 +23,7 @@ import ai.timefold.solver.core.api.solver.SolverManager;
 import ai.timefold.solver.core.api.solver.SolverStatus;
 import ai.timefold.solver.core.api.solver.change.ProblemChange;
 import ai.timefold.solver.core.config.solver.SolverManagerConfig;
+import ai.timefold.solver.core.config.util.ConfigUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +48,12 @@ public final class DefaultSolverManager<Solution_, ProblemId_> implements Solver
         this.solverFactory = solverFactory;
         validateSolverFactory();
         int parallelSolverCount = solverManagerConfig.resolveParallelSolverCount();
-        solverThreadPool = Executors.newFixedThreadPool(parallelSolverCount);
+        var threadFactory = Executors.defaultThreadFactory();
+        if (solverManagerConfig.getThreadFactoryClass() != null) {
+            threadFactory = ConfigUtils.newInstance(solverManagerConfig, "threadFactoryClass",
+                    solverManagerConfig.getThreadFactoryClass());
+        }
+        solverThreadPool = Executors.newFixedThreadPool(parallelSolverCount, threadFactory);
         problemIdToSolverJobMap = new ConcurrentHashMap<>(parallelSolverCount * 10);
     }
 
@@ -76,19 +82,21 @@ public final class DefaultSolverManager<Solution_, ProblemId_> implements Solver
             Function<? super ProblemId_, ? extends Solution_> problemFinder,
             Consumer<? super Solution_> bestSolutionConsumer,
             Consumer<? super Solution_> finalBestSolutionConsumer,
+            Consumer<? super Solution_> initializedSolutionConsumer,
             BiConsumer<? super ProblemId_, ? super Throwable> exceptionHandler,
             SolverConfigOverride<Solution_> solverConfigOverride) {
         if (bestSolutionConsumer == null) {
             throw new IllegalStateException("The consumer bestSolutionConsumer is required.");
         }
         return solve(getProblemIdOrThrow(problemId), problemFinder, bestSolutionConsumer, finalBestSolutionConsumer,
-                exceptionHandler, solverConfigOverride);
+                initializedSolutionConsumer, exceptionHandler, solverConfigOverride);
     }
 
     protected SolverJob<Solution_, ProblemId_> solve(ProblemId_ problemId,
             Function<? super ProblemId_, ? extends Solution_> problemFinder,
             Consumer<? super Solution_> bestSolutionConsumer,
             Consumer<? super Solution_> finalBestSolutionConsumer,
+            Consumer<? super Solution_> initializedSolutionConsumer,
             BiConsumer<? super ProblemId_, ? super Throwable> exceptionHandler,
             SolverConfigOverride<Solution_> configOverride) {
         Solver<Solution_> solver = solverFactory.buildSolver(configOverride);
@@ -102,8 +110,8 @@ public final class DefaultSolverManager<Solution_, ProblemId_> implements Solver
                         // TODO Future features: automatically restart solving by calling reloadProblem()
                         throw new IllegalStateException("The problemId (" + problemId + ") is already solving.");
                     } else {
-                        return new DefaultSolverJob<>(this, solver, problemId, problemFinder,
-                                bestSolutionConsumer, finalBestSolutionConsumer, finalExceptionHandler);
+                        return new DefaultSolverJob<>(this, solver, problemId, problemFinder, bestSolutionConsumer,
+                                finalBestSolutionConsumer, initializedSolutionConsumer, finalExceptionHandler);
                     }
                 });
         Future<Solution_> future = solverThreadPool.submit(solverJob);

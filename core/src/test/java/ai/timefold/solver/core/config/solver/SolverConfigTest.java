@@ -35,6 +35,7 @@ import ai.timefold.solver.core.config.constructionheuristic.ConstructionHeuristi
 import ai.timefold.solver.core.config.localsearch.LocalSearchPhaseConfig;
 import ai.timefold.solver.core.impl.heuristic.move.DummyMove;
 import ai.timefold.solver.core.impl.heuristic.selector.common.decorator.SelectionFilter;
+import ai.timefold.solver.core.impl.heuristic.selector.common.nearby.NearbyDistanceMeter;
 import ai.timefold.solver.core.impl.heuristic.selector.move.factory.MoveIteratorFactory;
 import ai.timefold.solver.core.impl.heuristic.selector.move.factory.MoveListFactory;
 import ai.timefold.solver.core.impl.heuristic.selector.move.generic.ChangeMove;
@@ -47,6 +48,9 @@ import ai.timefold.solver.core.impl.testdata.domain.TestdataSolution;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataValue;
 import ai.timefold.solver.core.impl.testdata.domain.extended.TestdataAnnotatedExtendedEntity;
 import ai.timefold.solver.core.impl.testdata.domain.extended.TestdataAnnotatedExtendedSolution;
+import ai.timefold.solver.core.impl.testdata.domain.interface_domain.TestdataInterfaceConstraintProvider;
+import ai.timefold.solver.core.impl.testdata.domain.interface_domain.TestdataInterfaceEntity;
+import ai.timefold.solver.core.impl.testdata.domain.interface_domain.TestdataInterfaceSolution;
 import ai.timefold.solver.core.impl.testdata.domain.record.TestdataRecordEntity;
 import ai.timefold.solver.core.impl.testdata.domain.record.TestdataRecordSolution;
 
@@ -182,6 +186,7 @@ class SolverConfigTest {
         verify(classVisitor, atLeastOnce()).accept(DummyEasyScoreCalculator.class);
         verify(classVisitor, atLeastOnce()).accept(DummyConstraintProvider.class);
         verify(classVisitor, atLeastOnce()).accept(DummyIncrementalScoreCalculator.class);
+        verify(classVisitor, atLeastOnce()).accept(DummyNearbyDistanceClass.class);
         verify(classVisitor, atLeastOnce()).accept(DummyEntityFilter.class);
         verify(classVisitor, atLeastOnce()).accept(DummyValueFilter.class);
         verify(classVisitor, atLeastOnce()).accept(DummyChangeMoveFilter.class);
@@ -221,6 +226,20 @@ class SolverConfigTest {
                 .buildSolver();
 
         var solution = TestdataRecordSolution.generateSolution();
+        Assertions.assertThatNoException().isThrownBy(() -> solver.solve(solution));
+    }
+
+    @Test
+    void domainClassesAreInterfaces() {
+        var solverConfig = new SolverConfig()
+                .withSolutionClass(TestdataInterfaceSolution.class)
+                .withEntityClasses(TestdataInterfaceEntity.class)
+                .withConstraintProviderClass(TestdataInterfaceConstraintProvider.class)
+                .withPhases(new ConstructionHeuristicPhaseConfig()); // Run CH and finish.
+        var solver = SolverFactory.create(solverConfig)
+                .buildSolver();
+
+        var solution = TestdataInterfaceSolution.generateSolution();
         Assertions.assertThatNoException().isThrownBy(() -> solver.solve(solution));
     }
 
@@ -372,6 +391,14 @@ class SolverConfigTest {
     }
 
     public abstract static class DummyMoveListFactory implements MoveListFactory<TestdataSolution> {
+    }
+
+    public class DummyNearbyDistanceClass implements NearbyDistanceMeter<String, String> {
+
+        @Override
+        public double getNearbyDistance(String origin, String destination) {
+            return 0;
+        }
     }
 
 }

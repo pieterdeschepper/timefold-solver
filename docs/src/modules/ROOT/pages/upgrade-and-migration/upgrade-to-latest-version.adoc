@@ -57,6 +57,93 @@ Every upgrade note indicates how likely your code will be affected by that chang
 The upgrade recipe often lists the changes as they apply to Java code.
 We kindly ask Kotlin and Python users to translate the changes accordingly.
 
+=== Upgrade from 1.12.0 to 1.13.0 (Work in progress)
+
+icon:exclamation-triangle[role=red] `@ConstraintConfiguration` deprecated
+[%collapsible%open]
+====
+`@ConstraintConfiguration` has been deprecated and will be removed in a future major version.
+Please use xref:constraints-and-score/constraint-configuration.adoc#definingAndOverridingConstraintWeights[constraint weight overrides] instead.
+
+Before in `*ConstraintProvider.java`:
+
+[source,java]
+----
+...
+    .penalizeConfigurable()
+    .asConstraint("maxHoursWorked");
+...
+----
+
+After in `*ConstraintProvider.java`:
+
+[source,java]
+----
+...
+    .penalize(ONE_SOFT)
+    .asConstraint("maxHoursWorked");
+...
+----
+
+Before in `*Solution.java`:
+
+[source,java]
+----
+...
+    @ConstraintConfiguration
+    private MyConstraintConfiguration myConstraintConfiguration;
+...
+----
+
+After in `*Solution.java`:
+
+[source,java]
+----
+...
+    ConstraintWeightOverrides<HardSoftScore> constraintWeightOverrides;
+...
+    constraintWeightOverrides = ConstraintWeightOverrides.of(
+        Map.of(
+            "maxHoursWorked", HardSoftScore.ofSoft(10)
+        )
+    );
+...
+----
+
+====
+
+'''
+
+.icon:info-circle[role=yellow] Constraint packages have been deprecated
+[%collapsible%open]
+====
+In the solver, constraints are uniquely identified by their package and name.
+We have now deprecated the package name and we recommend to keep constraint names unique instead.
+
+Before in `*ConstraintProvider.java`:
+
+[source,java]
+----
+...
+    .penalize(ONE_SOFT)
+    .asConstraint("employees.paris", "maxHoursWorked");
+...
+----
+
+After in `*ConstraintProvider.java`:
+
+[source,java]
+----
+...
+    .penalize(ONE_SOFT)
+    .asConstraint("employees.paris.maxHoursWorked");
+...
+----
+
+While constraint packages are still supported, they will be removed in a future major version.
+====
+
+
 === Upgrade from 1.9.0 to 1.10.0
 
 .icon:info-circle[role=yellow] Pinning unassigned entities now fails fast, unless allowed
@@ -256,7 +343,7 @@ None of these changes are likely to affect you, unless you have chosen to depend
 .icon:exclamation-triangle[role=red] Constraint Verifier: Check your tests if you use the planning list variable
 [%collapsible%open]
 ====
-In some cases, especially if you've reused our https://github.com/TimefoldAI/timefold-quickstarts/tree/stable/use-cases/food-packaging[Food Packaging quickstart], you may see your tests failing after the upgrade.
+In some cases, especially if you've reused our https://github.com/TimefoldAI/timefold-quickstarts/tree/stable/java/food-packaging[Food Packaging quickstart], you may see your tests failing after the upgrade.
 This is due to a bug fix in xref:constraints-and-score/score-calculation.adoc#constraintStreams[Constraint Streams], which now currently handles values not present in any list variable.
 
 If your code has a shadow entity whose xref:using-timefold-solver/modeling-planning-problems.adoc#listVariableShadowVariablesInverseRelation[inverse relation shadow variable] is a planning list variable and your test leaves that reference `null`, the constraints will no longer take that shadow entity into account.
@@ -270,7 +357,7 @@ Before in `*ConstraintProviderTest.java`:
 ----
 Job job = new Job("job1", ...);
 
-constraintVerifier.verifyThat(FoodPackagingConstraintProvider::dueDateTime)
+constraintVerifier.verifyThat(FoodPackagingConstraintProvider::maxEndDateTime)
     .given(job)
     .penalizesBy(...);
 ----
@@ -283,7 +370,7 @@ Job job = new Job("job1",  ...);
 Line line = new Line("line1", ...);
 job.setLine(line);
 
-constraintVerifier.verifyThat(FoodPackagingConstraintProvider::dueDateTime)
+constraintVerifier.verifyThat(FoodPackagingConstraintProvider::maxEndDateTime)
     .given(job)
     .penalizesBy(...);
 ----

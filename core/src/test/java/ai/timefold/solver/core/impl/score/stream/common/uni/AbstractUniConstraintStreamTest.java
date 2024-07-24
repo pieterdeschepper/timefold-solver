@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.SoftAssertions.assertSoftly;
 
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,10 +35,12 @@ import ai.timefold.solver.core.api.score.stream.Constraint;
 import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.DefaultConstraintJustification;
+import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 import ai.timefold.solver.core.impl.score.stream.common.AbstractConstraintStreamTest;
 import ai.timefold.solver.core.impl.score.stream.common.ConstraintStreamFunctionalTest;
 import ai.timefold.solver.core.impl.score.stream.common.ConstraintStreamImplSupport;
+import ai.timefold.solver.core.impl.testdata.domain.TestdataConstraintProvider;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataEntity;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataSolution;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataValue;
@@ -72,10 +75,6 @@ public abstract class AbstractUniConstraintStreamTest
     protected AbstractUniConstraintStreamTest(ConstraintStreamImplSupport implSupport) {
         super(implSupport);
     }
-
-    // ************************************************************************
-    // Filter
-    // ************************************************************************
 
     @TestTemplate
     public void filter_problemFact() {
@@ -185,10 +184,6 @@ public abstract class AbstractUniConstraintStreamTest
         scoreDirector.afterEntityRemoved(entity4);
         assertScore(scoreDirector);
     }
-
-    // ************************************************************************
-    // Join
-    // ************************************************************************
 
     @TestTemplate
     public void join_unknownClass() {
@@ -433,10 +428,6 @@ public abstract class AbstractUniConstraintStreamTest
                 assertMatch(1, extra1),
                 assertMatch(1, extra2));
     }
-
-    // ************************************************************************
-    // If (not) exists
-    // ************************************************************************
 
     @Override
     @TestTemplate
@@ -963,10 +954,6 @@ public abstract class AbstractUniConstraintStreamTest
                 assertMatch(1));
     }
 
-    // ************************************************************************
-    // For Each
-    // ************************************************************************
-
     @TestTemplate
     public void forEach_unknownClass() {
         assertThatThrownBy(() -> buildScoreDirector(factory -> factory.forEach(Integer.class)
@@ -1318,10 +1305,6 @@ public abstract class AbstractUniConstraintStreamTest
         assertScore(scoreDirector,
                 assertMatch(entityB, entityC));
     }
-
-    // ************************************************************************
-    // Group by
-    // ************************************************************************
 
     @TestTemplate
     public void groupBy_1Mapping0Collect_filtered() {
@@ -1941,10 +1924,6 @@ public abstract class AbstractUniConstraintStreamTest
                 assertMatchWithScore(-1, entity4, group2, value1, entity4.getCode()),
                 assertMatchWithScore(-1, entity5, group1, value2, entity5.getCode()));
     }
-
-    // ************************************************************************
-    // Map/flatten/distinct/concat
-    // ************************************************************************
 
     @Override
     @TestTemplate
@@ -2903,9 +2882,43 @@ public abstract class AbstractUniConstraintStreamTest
                 assertMatchWithScore(-1, value2, 1));
     }
 
-    // ************************************************************************
-    // Penalize/reward
-    // ************************************************************************
+    @Override
+    @TestTemplate
+    public void complement() {
+        var solution = TestdataLavishSolution.generateSolution(2, 5, 1, 1);
+        var value1 = solution.getFirstValue();
+        var value2 = new TestdataLavishValue("MyValue 2", solution.getFirstValueGroup());
+        var entity1 = solution.getFirstEntity();
+        var entity2 = new TestdataLavishEntity("MyEntity 2", solution.getFirstEntityGroup(),
+                value2);
+        solution.getEntityList().add(entity2);
+        var entity3 = new TestdataLavishEntity("MyEntity 3", solution.getFirstEntityGroup(),
+                value2);
+        solution.getEntityList().add(entity3);
+
+        var scoreDirector =
+                buildScoreDirector(factory -> factory.forEach(TestdataLavishEntity.class)
+                        .filter(entity -> entity.getValue() == value1)
+                        .complement(TestdataLavishEntity.class)
+                        .penalize(SimpleScore.ONE)
+                        .asConstraint(TEST_CONSTRAINT_NAME));
+
+        // From scratch
+        scoreDirector.setWorkingSolution(solution);
+        assertScore(scoreDirector,
+                assertMatch(entity1),
+                assertMatch(entity2),
+                assertMatch(entity3));
+
+        // Incremental; all entities are still present.
+        scoreDirector.beforeVariableChanged(entity2, "value");
+        entity2.setValue(value1);
+        scoreDirector.afterVariableChanged(entity2, "value");
+        assertScore(scoreDirector,
+                assertMatch(entity1),
+                assertMatch(entity2),
+                assertMatch(entity3));
+    }
 
     @Override
     @TestTemplate
@@ -3660,10 +3673,6 @@ public abstract class AbstractUniConstraintStreamTest
         assertThat(oneWeightMonitorCount.get()).isEqualTo(1);
     }
 
-    // ************************************************************************
-    // from() (deprecated)
-    // ************************************************************************
-
     @TestTemplate
     @Deprecated(forRemoval = true)
     public void fromIncludesNullWhenAllowsUnassigned() {
@@ -3684,4 +3693,22 @@ public abstract class AbstractUniConstraintStreamTest
                 assertMatch(entityWithNull),
                 assertMatch(entityWithValue));
     }
+
+    @TestTemplate
+    public void constraintProvidedFromUnknownPackage() throws ClassNotFoundException, NoSuchMethodException,
+            InvocationTargetException, IllegalAccessException {
+        var clz = Class.forName("TestdataInUnnamedPackageSolution");
+        var solution = clz.getMethod("generateSolution").invoke(null);
+        var solutionDescriptor = (SolutionDescriptor) clz.getMethod("buildSolutionDescriptor").invoke(null);
+        var entityList = (List<TestdataEntity>) clz.getMethod("getEntityList")
+                .invoke(solution);
+        entityList.removeIf(entity -> !Objects.equals(entity.getCode(), "Generated Entity 0"));
+
+        InnerScoreDirector scoreDirector = buildScoreDirector(solutionDescriptor, new TestdataConstraintProvider());
+
+        scoreDirector.setWorkingSolution(solution);
+        assertScore(scoreDirector,
+                assertMatch("unnamed.package", "Always penalize", entityList.get(0)));
+    }
+
 }

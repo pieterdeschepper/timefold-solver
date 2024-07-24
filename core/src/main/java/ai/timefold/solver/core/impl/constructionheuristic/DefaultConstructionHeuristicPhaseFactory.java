@@ -45,8 +45,9 @@ public class DefaultConstructionHeuristicPhaseFactory<Solution_>
     }
 
     @Override
-    public ConstructionHeuristicPhase<Solution_> buildPhase(int phaseIndex, HeuristicConfigPolicy<Solution_> solverConfigPolicy,
-            BestSolutionRecaller<Solution_> bestSolutionRecaller, Termination<Solution_> solverTermination) {
+    public ConstructionHeuristicPhase<Solution_> buildPhase(int phaseIndex, boolean triggerFirstInitializedSolutionEvent,
+            HeuristicConfigPolicy<Solution_> solverConfigPolicy, BestSolutionRecaller<Solution_> bestSolutionRecaller,
+            Termination<Solution_> solverTermination) {
         ConstructionHeuristicType constructionHeuristicType_ = Objects.requireNonNullElse(
                 phaseConfig.getConstructionHeuristicType(),
                 ConstructionHeuristicType.ALLOCATE_ENTITY_FROM_QUEUE);
@@ -56,14 +57,6 @@ public class DefaultConstructionHeuristicPhaseFactory<Solution_>
         ValueSorterManner valueSorterManner = Objects.requireNonNullElse(
                 phaseConfig.getValueSorterManner(),
                 constructionHeuristicType_.getDefaultValueSorterManner());
-        if (!valueSorterManner.isNonePossible() && solverConfigPolicy.getNearbyDistanceMeterClass() != null) {
-            throw new IllegalStateException(
-                    """
-                            Auto-configured nearby selection does not support value sorting.
-                            Maybe remove constructionHeuristicType from your construction heuristics settings.
-                            Maybe remove valueSorterManner from your construction heuristics settings.
-                            Maybe disable auto-configured nearby selection by setting nearbyDistanceMeterClass to null in your solver config.""");
-        }
         HeuristicConfigPolicy<Solution_> phaseConfigPolicy = solverConfigPolicy.cloneBuilder()
                 .withReinitializeVariableFilterEnabled(true)
                 .withInitializedChainedValueFilterEnabled(true)
@@ -79,6 +72,7 @@ public class DefaultConstructionHeuristicPhaseFactory<Solution_>
 
         DefaultConstructionHeuristicPhase.Builder<Solution_> builder = new DefaultConstructionHeuristicPhase.Builder<>(
                 phaseIndex,
+                triggerFirstInitializedSolutionEvent,
                 solverConfigPolicy.getLogIndentation(),
                 phaseTermination,
                 entityPlacer,

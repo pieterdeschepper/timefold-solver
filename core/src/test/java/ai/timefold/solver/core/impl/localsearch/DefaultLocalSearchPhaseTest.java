@@ -14,6 +14,8 @@ import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataEntity;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataSolution;
 import ai.timefold.solver.core.impl.testdata.domain.TestdataValue;
+import ai.timefold.solver.core.impl.testdata.domain.chained.TestdataChainedEntity;
+import ai.timefold.solver.core.impl.testdata.domain.chained.TestdataChainedSolution;
 import ai.timefold.solver.core.impl.testdata.domain.list.TestdataListEntity;
 import ai.timefold.solver.core.impl.testdata.domain.list.TestdataListSolution;
 import ai.timefold.solver.core.impl.testdata.domain.list.TestdataListValue;
@@ -245,6 +247,16 @@ class DefaultLocalSearchPhaseTest {
     }
 
     @Test
+    void solveMultiVarChainedVariable() {
+        var solverConfig = PlannerTestUtils.buildSolverConfig(TestdataChainedSolution.class, TestdataChainedEntity.class);
+
+        var solution = TestdataChainedSolution.generateUninitializedSolution(6, 2);
+
+        solution = PlannerTestUtils.solve(solverConfig, solution);
+        assertThat(solution).isNotNull();
+    }
+
+    @Test
     void solveListVariableWithExternalizedInverseAndIndexSupplies() {
         var solverConfig = PlannerTestUtils.buildSolverConfig(
                 TestdataListSolutionExternalized.class, TestdataListEntityExternalized.class);
@@ -253,6 +265,30 @@ class DefaultLocalSearchPhaseTest {
 
         solution = PlannerTestUtils.solve(solverConfig, solution);
         assertThat(solution).isNotNull();
+    }
+
+    @Test
+    void failsFastWithUninitializedSolutionBasicVariable() {
+        var solverConfig = PlannerTestUtils.buildSolverConfig(TestdataSolution.class, TestdataEntity.class);
+        solverConfig.withPhases(solverConfig.getPhaseConfigList().get(1)); // Remove construction heuristic.
+
+        var solution = PlannerTestUtils.generateTestdataSolution("s1", 2);
+
+        assertThatThrownBy(() -> PlannerTestUtils.solve(solverConfig, solution))
+                .hasMessageContaining("uninitialized entities");
+    }
+
+    @Test
+    void failsFastWithUninitializedSolutionListVariable() {
+        var solverConfig = PlannerTestUtils.buildSolverConfig(
+                TestdataListSolutionExternalized.class, TestdataListEntityExternalized.class);
+        solverConfig.withPhases(solverConfig.getPhaseConfigList().get(1)); // Remove construction heuristic.
+
+        var solution = TestdataListSolutionExternalized.generateUninitializedSolution(6, 2);
+
+        assertThatThrownBy(() -> PlannerTestUtils.solve(solverConfig, solution))
+                .hasMessageContaining("planning list variable")
+                .hasMessageContaining("unexpected unassigned values");
     }
 
 }

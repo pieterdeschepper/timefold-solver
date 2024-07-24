@@ -18,7 +18,7 @@ System.out.println(solutionManager.explain(vehicleRoutePlan));
 ----
 
 For example, in vehicle routing,
-this prints that talk `vehicle '1'` matched the soft constraint `minimizeTravelTime`:
+this prints that vehicle `vehicle '1'` matched the soft constraint `minimizeTravelTime`:
 
 ----
 Explanation of score (0hard/-10343soft):
@@ -45,7 +45,7 @@ In the string above, there are some previously unexplained concepts.
 * A _Constraint match_ is created every time a constraint causes a change to the score.
 * _Justifications_ are user-defined objects that implement the `ai.timefold.solver.core.api.score.stream.ConstraintJustification` interface,
 which carry meaningful information about a constraint match,
-such as its package, name and any metadata that the user chooses to expose.
+such as its name and any metadata that the user chooses to expose.
 Justifications are most easily available via <<scoreAnalysis,score analysis>>.
 * _Indicted objects_ are objects which were directly involved in causing a constraint to match.
 For example, if your constraints penalize each vehicle,
@@ -82,6 +82,32 @@ Using score analysis, you can find out:
 * Which constraints are broken, and how many times.
 * Which planning entities and problem facts are responsible for breaking which constraints.
 
+It is also possible to print the score summary:
+
+[source,java,options="nowrap"]
+----
+SolutionManager<VehicleRoutePlan, HardSoftLongScore> solutionManager = SolutionManager.create(solverFactory);
+ScoreAnalysis<HardSoftLongScore> scoreAnalysis = solutionManager.analyze(vehicleRoutePlan);
+System.out.println(scoreAnalysis.summarize());
+----
+
+For example,
+this prints that vehicle `vehicle '1'` matched the soft constraint `minimizeTravelTime`:
+
+----
+Explanation of score (0hard/-10343soft):
+    Constraint matches:
+        -10343soft: constraint (minimizeTravelTime) has 6 matches:
+            -2335soft: justified with (MinimizeTravelTimeJustification[vehicleName=1, totalDrivingTimeSeconds=2335, description=Vehicle '1' total travel time is 0 hours 39 minutes.])
+            ...
+        ...
+----
+
+[IMPORTANT]
+====
+Do not attempt to parse this string or expose it in services.
+It serves for debugging purposes only.
+====
 
 [#scoreAnalysisBrokenConstraints]
 === Finding the broken constraints

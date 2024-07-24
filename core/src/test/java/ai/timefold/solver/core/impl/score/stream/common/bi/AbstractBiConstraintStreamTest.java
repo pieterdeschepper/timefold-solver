@@ -57,10 +57,6 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         super(implSupport);
     }
 
-    // ************************************************************************
-    // Filter
-    // ************************************************************************
-
     @Override
     @TestTemplate
     public void filter_entity() {
@@ -133,10 +129,6 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         scoreDirector.afterEntityRemoved(entity4);
         assertScore(scoreDirector);
     }
-
-    // ************************************************************************
-    // Join
-    // ************************************************************************
 
     @Override
     @TestTemplate
@@ -453,10 +445,6 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
                 assertMatch(1, 1, extra1),
                 assertMatch(1, 1, extra2));
     }
-
-    // ************************************************************************
-    // If (not) exists
-    // ************************************************************************
 
     @Override
     @TestTemplate
@@ -904,10 +892,6 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
                 assertMatch(1, 1));
     }
 
-    // ************************************************************************
-    // Group by
-    // ************************************************************************
-
     @Override
     @TestTemplate
     public void groupBy_1Mapping0Collector() {
@@ -958,8 +942,8 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         // From scratch
         scoreDirector.setWorkingSolution(solution);
         assertScore(scoreDirector,
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, solution.getFirstEntity().toString(), 6),
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, solution.getEntityList().get(1).toString(), 5));
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, solution.getFirstEntity().toString(), 6),
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, solution.getEntityList().get(1).toString(), 5));
 
         // Incremental; we have a new first entity, and less entities in total.
         TestdataLavishEntity entity = solution.getFirstEntity();
@@ -967,7 +951,7 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         solution.getEntityList().remove(entity);
         scoreDirector.afterEntityRemoved(entity);
         assertScore(scoreDirector,
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, solution.getFirstEntity().toString(), 5));
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, solution.getFirstEntity().toString(), 5));
     }
 
     @Override
@@ -989,8 +973,8 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         // From scratch
         scoreDirector.setWorkingSolution(solution);
         assertScore(scoreDirector,
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, entity1.toString(), 2, singleton(entity1)),
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, entity2.toString(), 1, singleton(entity2)));
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, entity1.toString(), 2, singleton(entity1)),
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, entity2.toString(), 1, singleton(entity2)));
 
         // Incremental
         TestdataLavishEntity entity = solution.getFirstEntity();
@@ -998,7 +982,7 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         solution.getEntityList().remove(entity);
         scoreDirector.afterEntityRemoved(entity);
         assertScore(scoreDirector,
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, entity2.toString(), 1, singleton(entity2)));
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, entity2.toString(), 1, singleton(entity2)));
     }
 
     @Override
@@ -1023,9 +1007,9 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         // From scratch
         scoreDirector.setWorkingSolution(solution);
         assertScore(scoreDirector,
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, entity1.toString(), Long.MAX_VALUE, Long.MAX_VALUE,
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, entity1.toString(), Long.MAX_VALUE, Long.MAX_VALUE,
                         singleton(entity1)),
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, entity2.toString(), Long.MIN_VALUE, Long.MIN_VALUE,
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, entity2.toString(), Long.MIN_VALUE, Long.MIN_VALUE,
                         singleton(entity2)));
 
         // Incremental
@@ -1034,7 +1018,7 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         solution.getEntityList().remove(entity);
         scoreDirector.afterEntityRemoved(entity);
         assertScore(scoreDirector,
-                assertMatchWithScore(-1, TEST_CONSTRAINT_NAME, entity2.toString(), Long.MIN_VALUE, Long.MIN_VALUE,
+                assertMatchWithScore(-1, null, TEST_CONSTRAINT_NAME, entity2.toString(), Long.MIN_VALUE, Long.MIN_VALUE,
                         singleton(entity2)));
     }
 
@@ -1344,10 +1328,6 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
         assertScore(scoreDirector,
                 assertMatchWithScore(-1, group2, group3, value2, value1));
     }
-
-    // ************************************************************************
-    // Map/flatten/distinct/concat
-    // ************************************************************************
 
     @Override
     @TestTemplate
@@ -2322,9 +2302,48 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
                 assertMatchWithScore(-1, value2, value3, 1));
     }
 
-    // ************************************************************************
-    // Penalize/reward
-    // ************************************************************************
+    @Override
+    @TestTemplate
+    public void complement() {
+        var solution = TestdataLavishSolution.generateSolution(2, 5, 1, 1);
+        var value1 = solution.getFirstValue();
+        var value2 = new TestdataLavishValue("MyValue 2", solution.getFirstValueGroup());
+        var entity1 = solution.getFirstEntity();
+        var entity2 = new TestdataLavishEntity("MyEntity 2", solution.getFirstEntityGroup(),
+                value2);
+        solution.getEntityList().add(entity2);
+        var entity3 = new TestdataLavishEntity("MyEntity 3", solution.getFirstEntityGroup(),
+                value2);
+        solution.getEntityList().add(entity3);
+
+        var scoreDirector =
+                buildScoreDirector(factory -> factory.forEach(TestdataLavishEntity.class)
+                        .expand(a -> {
+                            var code = a.getValue().getCode();
+                            var indexString = code.substring(code.length() - 1);
+                            return Integer.parseInt(indexString);
+                        })
+                        .filter((entity, index) -> index == 0)
+                        .complement(TestdataLavishEntity.class, e -> Integer.MAX_VALUE)
+                        .penalize(SimpleScore.ONE)
+                        .asConstraint(TEST_CONSTRAINT_NAME));
+
+        // From scratch
+        scoreDirector.setWorkingSolution(solution);
+        assertScore(scoreDirector,
+                assertMatch(entity1, 0),
+                assertMatch(entity2, Integer.MAX_VALUE),
+                assertMatch(entity3, Integer.MAX_VALUE));
+
+        // Incremental; all entities are still present, but the indexes are different.
+        scoreDirector.beforeVariableChanged(entity2, "value");
+        entity2.setValue(value1);
+        scoreDirector.afterVariableChanged(entity2, "value");
+        assertScore(scoreDirector,
+                assertMatch(entity1, 0),
+                assertMatch(entity2, 0),
+                assertMatch(entity3, Integer.MAX_VALUE));
+    }
 
     @Override
     @TestTemplate
@@ -3021,10 +3040,6 @@ public abstract class AbstractBiConstraintStreamTest extends AbstractConstraintS
                         .asConstraint(TEST_CONSTRAINT_NAME)))
                 .hasMessageContaining("Maybe the constraint calls indictWith() twice?");
     }
-
-    // ************************************************************************
-    // Combinations
-    // ************************************************************************
 
     @TestTemplate
     public void joinerEqualsAndSameness() {

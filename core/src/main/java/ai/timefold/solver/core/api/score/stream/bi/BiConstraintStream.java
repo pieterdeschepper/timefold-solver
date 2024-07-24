@@ -1,5 +1,11 @@
 package ai.timefold.solver.core.api.score.stream.bi;
 
+import static ai.timefold.solver.core.impl.util.ConstantLambdaUtils.biConstantNull;
+import static ai.timefold.solver.core.impl.util.ConstantLambdaUtils.biConstantOne;
+import static ai.timefold.solver.core.impl.util.ConstantLambdaUtils.biConstantOneBigDecimal;
+import static ai.timefold.solver.core.impl.util.ConstantLambdaUtils.biConstantOneLong;
+import static ai.timefold.solver.core.impl.util.ConstantLambdaUtils.uniConstantNull;
+
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -11,6 +17,8 @@ import java.util.function.ToLongBiFunction;
 import ai.timefold.solver.core.api.domain.constraintweight.ConstraintConfiguration;
 import ai.timefold.solver.core.api.domain.constraintweight.ConstraintWeight;
 import ai.timefold.solver.core.api.domain.entity.PlanningEntity;
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
+import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.function.TriFunction;
 import ai.timefold.solver.core.api.function.TriPredicate;
 import ai.timefold.solver.core.api.score.Score;
@@ -371,6 +379,89 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * Create a new {@link BiConstraintStream} for every pair of A and B where C exists for which the {@link TriJoiner}
      * is true (for the properties it extracts from the facts).
+     * <p>
+     * This method has overloaded methods with multiple {@link TriJoiner} parameters.
+     *
+     * @param otherStream never null
+     * @param joiner never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C exists for which the {@link TriJoiner}
+     *         is true
+     */
+    default <C> BiConstraintStream<A, B> ifExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner) {
+        return ifExists(otherStream, new TriJoiner[] { joiner });
+    }
+
+    /**
+     * As defined by {@link #ifExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     *
+     * @param otherStream never null
+     * @param joiner1 never null
+     * @param joiner2 never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C exists for which the {@link TriJoiner}s
+     *         are true
+     */
+    default <C> BiConstraintStream<A, B> ifExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner1,
+            TriJoiner<A, B, C> joiner2) {
+        return ifExists(otherStream, new TriJoiner[] { joiner1, joiner2 });
+    }
+
+    /**
+     * As defined by {@link #ifExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     *
+     * @param otherStream never null
+     * @param joiner1 never null
+     * @param joiner2 never null
+     * @param joiner3 never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C exists for which the {@link TriJoiner}s
+     *         are true
+     */
+    default <C> BiConstraintStream<A, B> ifExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner1,
+            TriJoiner<A, B, C> joiner2, TriJoiner<A, B, C> joiner3) {
+        return ifExists(otherStream, new TriJoiner[] { joiner1, joiner2, joiner3 });
+    }
+
+    /**
+     * As defined by {@link #ifExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     *
+     * @param otherStream never null
+     * @param joiner1 never null
+     * @param joiner2 never null
+     * @param joiner3 never null
+     * @param joiner4 never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C exists for which the {@link TriJoiner}s
+     *         are true
+     */
+    default <C> BiConstraintStream<A, B> ifExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner1,
+            TriJoiner<A, B, C> joiner2, TriJoiner<A, B, C> joiner3, TriJoiner<A, B, C> joiner4) {
+        return ifExists(otherStream, new TriJoiner[] { joiner1, joiner2, joiner3, joiner4 });
+    }
+
+    /**
+     * As defined by {@link #ifExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     * <p>
+     * This method causes <i>Unchecked generics array creation for varargs parameter</i> warnings,
+     * but we can't fix it with a {@link SafeVarargs} annotation because it's an interface method.
+     * Therefore, there are overloaded methods with up to 4 {@link TriJoiner} parameters.
+     *
+     * @param otherStream never null
+     * @param joiners never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C exists for which the {@link TriJoiner}s
+     *         are true
+     */
+    <C> BiConstraintStream<A, B> ifExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C>... joiners);
+
+    /**
+     * Create a new {@link BiConstraintStream} for every pair of A and B where C exists for which the {@link TriJoiner}
+     * is true (for the properties it extracts from the facts).
      * For classes annotated with {@link PlanningEntity},
      * this method also includes entities with null variables,
      * or entities that are not assigned to any list variable.
@@ -541,6 +632,89 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      *         {@link TriJoiner}s are true
      */
     <C> BiConstraintStream<A, B> ifNotExists(Class<C> otherClass, TriJoiner<A, B, C>... joiners);
+
+    /**
+     * Create a new {@link BiConstraintStream} for every pair of A and B where C does not exist for which the
+     * {@link TriJoiner} is true (for the properties it extracts from the facts).
+     * <p>
+     * This method has overloaded methods with multiple {@link TriJoiner} parameters.
+     *
+     * @param otherStream never null
+     * @param joiner never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C does not exist for which the
+     *         {@link TriJoiner} is true
+     */
+    default <C> BiConstraintStream<A, B> ifNotExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner) {
+        return ifNotExists(otherStream, new TriJoiner[] { joiner });
+    }
+
+    /**
+     * As defined by {@link #ifNotExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     *
+     * @param otherStream never null
+     * @param joiner1 never null
+     * @param joiner2 never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C does not exist for which the
+     *         {@link TriJoiner}s are true
+     */
+    default <C> BiConstraintStream<A, B> ifNotExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner1,
+            TriJoiner<A, B, C> joiner2) {
+        return ifNotExists(otherStream, new TriJoiner[] { joiner1, joiner2 });
+    }
+
+    /**
+     * As defined by {@link #ifNotExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     *
+     * @param otherStream never null
+     * @param joiner1 never null
+     * @param joiner2 never null
+     * @param joiner3 never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C does not exist for which the
+     *         {@link TriJoiner}s are true
+     */
+    default <C> BiConstraintStream<A, B> ifNotExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner1,
+            TriJoiner<A, B, C> joiner2, TriJoiner<A, B, C> joiner3) {
+        return ifNotExists(otherStream, new TriJoiner[] { joiner1, joiner2, joiner3 });
+    }
+
+    /**
+     * As defined by {@link #ifNotExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     *
+     * @param otherStream never null
+     * @param joiner1 never null
+     * @param joiner2 never null
+     * @param joiner3 never null
+     * @param joiner4 never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C does not exist for which the
+     *         {@link TriJoiner}s are true
+     */
+    default <C> BiConstraintStream<A, B> ifNotExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C> joiner1,
+            TriJoiner<A, B, C> joiner2, TriJoiner<A, B, C> joiner3, TriJoiner<A, B, C> joiner4) {
+        return ifNotExists(otherStream, new TriJoiner[] { joiner1, joiner2, joiner3, joiner4 });
+    }
+
+    /**
+     * As defined by {@link #ifNotExists(UniConstraintStream, TriJoiner)}.
+     * For performance reasons, indexing joiners must be placed before filtering joiners.
+     * <p>
+     * This method causes <i>Unchecked generics array creation for varargs parameter</i> warnings,
+     * but we can't fix it with a {@link SafeVarargs} annotation because it's an interface method.
+     * Therefore, there are overloaded methods with up to 4 {@link TriJoiner} parameters.
+     *
+     * @param otherStream never null
+     * @param joiners never null
+     * @param <C> the type of the third matched fact
+     * @return never null, a stream that matches every pair of A and B where C does not exist for which the
+     *         {@link TriJoiner}s are true
+     */
+    <C> BiConstraintStream<A, B> ifNotExists(UniConstraintStream<C> otherStream, TriJoiner<A, B, C>... joiners);
 
     /**
      * Create a new {@link BiConstraintStream} for every pair of A and B where C does not exist for which the
@@ -1069,12 +1243,34 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * For instance, if this stream consists of {@code [(A1, A2), (B1, B2), (C1, C2)]}
      * and the other stream consists of {@code [C, D, E]},
      * {@code this.concat(other)} will consist of {@code [(A1, A2), (B1, B2), (C1, C2), (C, null), (D, null), (E, null)]}.
+     * <p>
      * This operation can be thought of as an or between streams.
      *
      * @param otherStream never null
      * @return never null
      */
-    BiConstraintStream<A, B> concat(UniConstraintStream<A> otherStream);
+    default BiConstraintStream<A, B> concat(UniConstraintStream<A> otherStream) {
+        return concat(otherStream, uniConstantNull());
+    }
+
+    /**
+     * Returns a new {@link BiConstraintStream} containing all the tuples of both this {@link BiConstraintStream}
+     * and the provided {@link UniConstraintStream}.
+     * The {@link UniConstraintStream} tuples will be padded from the right by the result of the padding function.
+     *
+     * <p>
+     * For instance, if this stream consists of {@code [(A1, A2), (B1, B2), (C1, C2)]}
+     * and the other stream consists of {@code [C, D, E]},
+     * {@code this.concat(other, a -> null)} will consist of
+     * {@code [(A1, A2), (B1, B2), (C1, C2), (C, null), (D, null), (E, null)]}.
+     * <p>
+     * This operation can be thought of as an or between streams.
+     *
+     * @param otherStream never null
+     * @param paddingFunction never null, function to find the padding for the second fact
+     * @return never null
+     */
+    BiConstraintStream<A, B> concat(UniConstraintStream<A> otherStream, Function<A, B> paddingFunction);
 
     /**
      * Returns a new {@link BiConstraintStream} containing all the tuples of both this {@link BiConstraintStream} and the
@@ -1084,7 +1280,9 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * <p>
      * For instance, if this stream consists of {@code [(A, 1), (B, 2), (C, 3)]} and the other stream consists of
      * {@code [(C, 3), (D, 4), (E, 5)]}, {@code this.concat(other)} will consist of
-     * {@code [(A, 1), (B, 2), (C, 3), (C, 3), (D, 4), (E, 5)]}. This operation can be thought of as an or between streams.
+     * {@code [(A, 1), (B, 2), (C, 3), (C, 3), (D, 4), (E, 5)]}.
+     * <p>
+     * This operation can be thought of as an or between streams.
      *
      * @param otherStream never null
      * @return never null
@@ -1101,12 +1299,34 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * and the other stream consists of {@code [(C1, C2, C3), (D1, D2, D3), (E1, E2, E3)]},
      * {@code this.concat(other)} will consist of
      * {@code [(A1, A2, null), (B1, B2, null), (C1, C2, null), (C1, C2, C3), (D1, D2, D3), (E1, E2, E3)]}.
+     * <p>
      * This operation can be thought of as an or between streams.
      *
      * @param otherStream never null
      * @return never null
      */
-    <C> TriConstraintStream<A, B, C> concat(TriConstraintStream<A, B, C> otherStream);
+    default <C> TriConstraintStream<A, B, C> concat(TriConstraintStream<A, B, C> otherStream) {
+        return concat(otherStream, biConstantNull());
+    }
+
+    /**
+     * Returns a new {@link TriConstraintStream} containing all the tuples of both this {@link BiConstraintStream}
+     * and the provided {@link TriConstraintStream}.
+     * The {@link BiConstraintStream} tuples will be padded from the right by the result of the padding function.
+     *
+     * <p>
+     * For instance, if this stream consists of {@code [(A1, A2), (B1, B2), (C1, C2)]}
+     * and the other stream consists of {@code [(C1, C2, C3), (D1, D2, D3), (E1, E2, E3)]},
+     * {@code this.concat(other, (a, b) -> null)} will consist of
+     * {@code [(A1, A2, null), (B1, B2, null), (C1, C2, null), (C1, C2, C3), (D1, D2, D3), (E1, E2, E3)]}.
+     * <p>
+     * This operation can be thought of as an or between streams.
+     *
+     * @param otherStream never null
+     * @param paddingFunction never null, function to find the padding for the third fact
+     * @return never null
+     */
+    <C> TriConstraintStream<A, B, C> concat(TriConstraintStream<A, B, C> otherStream, BiFunction<A, B, C> paddingFunction);
 
     /**
      * Returns a new {@link QuadConstraintStream} containing all the tuples of both this {@link BiConstraintStream}
@@ -1119,15 +1339,40 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * {@code this.concat(other)} will consist of
      * {@code [(A1, A2, null, null), (B1, B2, null, null), (C1, C2, null, null),
      * (C1, C2, C3, C4), (D1, D2, D3, D4), (E1, E2, E3, E4)]}.
+     * <p>
      * This operation can be thought of as an or between streams.
      *
      * @param otherStream never null
      * @return never null
      */
-    <C, D> QuadConstraintStream<A, B, C, D> concat(QuadConstraintStream<A, B, C, D> otherStream);
+    default <C, D> QuadConstraintStream<A, B, C, D> concat(QuadConstraintStream<A, B, C, D> otherStream) {
+        return concat(otherStream, biConstantNull(), biConstantNull());
+    }
+
+    /**
+     * Returns a new {@link QuadConstraintStream} containing all the tuples of both this {@link BiConstraintStream}
+     * and the provided {@link QuadConstraintStream}.
+     * The {@link BiConstraintStream} tuples will be padded from the right by the results of the padding functions.
+     *
+     * <p>
+     * For instance, if this stream consists of {@code [(A1, A2), (B1, B2), (C1, C2)]}
+     * and the other stream consists of {@code [(C1, C2, C3, C4), (D1, D2, D3, D4), (E1, E2, E3, E4)]},
+     * {@code this.concat(other, (a, b) -> null, (a, b) -> null)} will consist of
+     * {@code [(A1, A2, null, null), (B1, B2, null, null), (C1, C2, null, null),
+     * (C1, C2, C3, C4), (D1, D2, D3, D4), (E1, E2, E3, E4)]}.
+     * <p>
+     * This operation can be thought of as an or between streams.
+     *
+     * @param otherStream never null
+     * @param paddingFunctionC never null, function to find the padding for the third fact
+     * @param paddingFunctionD never null, function to find the padding for the fourth fact
+     * @return never null
+     */
+    <C, D> QuadConstraintStream<A, B, C, D> concat(QuadConstraintStream<A, B, C, D> otherStream,
+            BiFunction<A, B, C> paddingFunctionC, BiFunction<A, B, D> paddingFunctionD);
 
     // ************************************************************************
-    // Other operations
+    // expand
     // ************************************************************************
 
     /**
@@ -1175,7 +1420,7 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * @return never null
      */
     default <Score_ extends Score<Score_>> BiConstraintBuilder<A, B, Score_> penalize(Score_ constraintWeight) {
-        return penalize(constraintWeight, ConstantLambdaUtils.biConstantOne());
+        return penalize(constraintWeight, biConstantOne());
     }
 
     /**
@@ -1184,7 +1429,7 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * @return never null
      */
     default <Score_ extends Score<Score_>> BiConstraintBuilder<A, B, Score_> penalizeLong(Score_ constraintWeight) {
-        return penalizeLong(constraintWeight, ConstantLambdaUtils.biConstantOneLong());
+        return penalizeLong(constraintWeight, biConstantOneLong());
     }
 
     /**
@@ -1193,13 +1438,16 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * @return never null
      */
     default <Score_ extends Score<Score_>> BiConstraintBuilder<A, B, Score_> penalizeBigDecimal(Score_ constraintWeight) {
-        return penalizeBigDecimal(constraintWeight, ConstantLambdaUtils.biConstantOneBigDecimal());
+        return penalizeBigDecimal(constraintWeight, biConstantOneBigDecimal());
     }
 
     /**
      * Applies a negative {@link Score} impact,
      * subtracting the constraintWeight multiplied by the match weight,
      * and returns a builder to apply optional constraint properties.
+     * <p>
+     * The constraintWeight specified here can be overridden using {@link ConstraintWeightOverrides}
+     * on the {@link PlanningSolution}-annotated class
      * <p>
      * For non-int {@link Score} types use {@link #penalizeLong(Score, ToLongBiFunction)} or
      * {@link #penalizeBigDecimal(Score, BiFunction)} instead.
@@ -1231,12 +1479,13 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the {@link ConstraintConfiguration},
      * so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #penalize(Score)} instead.
      *
      * @return never null
+     * @deprecated Prefer {@link #penalize(Score)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     default BiConstraintBuilder<A, B, ?> penalizeConfigurable() {
-        return penalizeConfigurable(ConstantLambdaUtils.biConstantOne());
+        return penalizeConfigurable(biConstantOne());
     }
 
     /**
@@ -1247,25 +1496,28 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the {@link ConstraintConfiguration},
      * so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #penalize(Score, ToIntBiFunction)} instead.
      *
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #penalize(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> penalizeConfigurable(ToIntBiFunction<A, B> matchWeigher);
 
     /**
      * As defined by {@link #penalizeConfigurable(ToIntBiFunction)}, with a penalty of type long.
-     * <p>
-     * If there is no {@link ConstraintConfiguration}, use {@link #penalizeLong(Score, ToLongBiFunction)} instead.
+     * 
+     * @deprecated Prefer {@link #penalizeLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> penalizeConfigurableLong(ToLongBiFunction<A, B> matchWeigher);
 
     /**
      * As defined by {@link #penalizeConfigurable(ToIntBiFunction)}, with a penalty of type {@link BigDecimal}.
-     * <p>
-     * If there is no {@link ConstraintConfiguration}, use {@link #penalizeBigDecimal(Score, BiFunction)} instead.
+     * 
+     * @deprecated Prefer {@link #penalizeBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> penalizeConfigurableBigDecimal(BiFunction<A, B, BigDecimal> matchWeigher);
 
     /**
@@ -1274,13 +1526,16 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * @return never null
      */
     default <Score_ extends Score<Score_>> BiConstraintBuilder<A, B, Score_> reward(Score_ constraintWeight) {
-        return reward(constraintWeight, ConstantLambdaUtils.biConstantOne());
+        return reward(constraintWeight, biConstantOne());
     }
 
     /**
      * Applies a positive {@link Score} impact,
      * adding the constraintWeight multiplied by the match weight,
      * and returns a builder to apply optional constraint properties.
+     * <p>
+     * The constraintWeight specified here can be overridden using {@link ConstraintWeightOverrides}
+     * on the {@link PlanningSolution}-annotated class
      * <p>
      * For non-int {@link Score} types use {@link #rewardLong(Score, ToLongBiFunction)} or
      * {@link #rewardBigDecimal(Score, BiFunction)} instead.
@@ -1312,12 +1567,13 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the {@link ConstraintConfiguration},
      * so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #reward(Score)} instead.
      *
      * @return never null
+     * @deprecated Prefer {@link #reward(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     default BiConstraintBuilder<A, B, ?> rewardConfigurable() {
-        return rewardConfigurable(ConstantLambdaUtils.biConstantOne());
+        return rewardConfigurable(biConstantOne());
     }
 
     /**
@@ -1328,25 +1584,28 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the {@link ConstraintConfiguration},
      * so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #reward(Score, ToIntBiFunction)} instead.
      *
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #reward(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> rewardConfigurable(ToIntBiFunction<A, B> matchWeigher);
 
     /**
      * As defined by {@link #rewardConfigurable(ToIntBiFunction)}, with a penalty of type long.
-     * <p>
-     * If there is no {@link ConstraintConfiguration}, use {@link #rewardLong(Score, ToLongBiFunction)} instead.
+     * 
+     * @deprecated Prefer {@link #rewardLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> rewardConfigurableLong(ToLongBiFunction<A, B> matchWeigher);
 
     /**
      * As defined by {@link #rewardConfigurable(ToIntBiFunction)}, with a penalty of type {@link BigDecimal}.
-     * <p>
-     * If there is no {@link ConstraintConfiguration}, use {@link #rewardBigDecimal(Score, BiFunction)} instead.
+     * 
+     * @deprecated Prefer {@link #rewardBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> rewardConfigurableBigDecimal(BiFunction<A, B, BigDecimal> matchWeigher);
 
     /**
@@ -1360,12 +1619,15 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * @return never null
      */
     default <Score_ extends Score<Score_>> BiConstraintBuilder<A, B, Score_> impact(Score_ constraintWeight) {
-        return impact(constraintWeight, ConstantLambdaUtils.biConstantOne());
+        return impact(constraintWeight, biConstantOne());
     }
 
     /**
      * Positively or negatively impacts the {@link Score} by constraintWeight multiplied by matchWeight for each match
      * and returns a builder to apply optional constraint properties.
+     * <p>
+     * The constraintWeight specified here can be overridden using {@link ConstraintWeightOverrides}
+     * on the {@link PlanningSolution}-annotated class
      * <p>
      * Use {@code penalize(...)} or {@code reward(...)} instead, unless this constraint can both have positive and
      * negative weights.
@@ -1396,12 +1658,13 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the {@link ConstraintConfiguration},
      * so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #impact(Score)} instead.
      *
      * @return never null
+     * @deprecated Prefer {@link #impact(Score)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     default BiConstraintBuilder<A, B, ?> impactConfigurable() {
-        return impactConfigurable(ConstantLambdaUtils.biConstantOne());
+        return impactConfigurable(biConstantOne());
     }
 
     /**
@@ -1411,25 +1674,63 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the {@link ConstraintConfiguration},
      * so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #impact(Score, ToIntBiFunction)} instead.
      *
      * @return never null
+     * @deprecated Prefer {@link #impact(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> impactConfigurable(ToIntBiFunction<A, B> matchWeigher);
 
     /**
      * As defined by {@link #impactConfigurable(ToIntBiFunction)}, with an impact of type long.
-     * <p>
-     * If there is no {@link ConstraintConfiguration}, use {@link #impactLong(Score, ToLongBiFunction)} instead.
+     * 
+     * @deprecated Prefer {@link #impactLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> impactConfigurableLong(ToLongBiFunction<A, B> matchWeigher);
 
     /**
      * As defined by {@link #impactConfigurable(ToIntBiFunction)}, with an impact of type BigDecimal.
-     * <p>
-     * If there is no {@link ConstraintConfiguration}, use {@link #impactBigDecimal(Score, BiFunction)} instead.
+     * 
+     * @deprecated Prefer {@link #impactBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
+    @Deprecated(forRemoval = true, since = "1.13.0")
     BiConstraintBuilder<A, B, ?> impactConfigurableBigDecimal(BiFunction<A, B, BigDecimal> matchWeigher);
+
+    // ************************************************************************
+    // complement
+    // ************************************************************************
+
+    /**
+     * As defined by {@link #complement(Class, Function)},
+     * where the padding function pads with null.
+     */
+    default BiConstraintStream<A, B> complement(Class<A> otherClass) {
+        return complement(otherClass, uniConstantNull());
+    }
+
+    /**
+     * Adds to the stream all instances of a given class which are not yet present in it.
+     * These instances must be present in the solution,
+     * which means the class needs to be either a planning entity or a problem fact.
+     * <p>
+     * The instances will be read from the first element of the input tuple.
+     * When an output tuple needs to be created for the newly inserted instances,
+     * the first element will be the new instance.
+     * The rest of the tuple will be padded with the result of the padding function,
+     * applied on the new instance.
+     *
+     * @param otherClass never null
+     * @param paddingFunction never null, function to find the padding for the second fact
+     * @return never null
+     */
+    default BiConstraintStream<A, B> complement(Class<A> otherClass, Function<A, B> paddingFunction) {
+        var firstStream = this;
+        var remapped = firstStream.map(ConstantLambdaUtils.biPickFirst());
+        var secondStream = getConstraintFactory().forEach(otherClass)
+                .ifNotExists(remapped, Joiners.equal());
+        return firstStream.concat(secondStream, paddingFunction);
+    }
 
     // ************************************************************************
     // Deprecated declarations
@@ -1632,10 +1933,10 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * For non-int {@link Score} types use {@link #penalizeConfigurableLong(String, ToLongBiFunction)} or
      * {@link #penalizeConfigurableBigDecimal(String, BiFunction)} instead.
      *
-     * @deprecated Prefer {@link #penalizeConfigurable(ToIntBiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #penalize(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint penalizeConfigurable(String constraintName, ToIntBiFunction<A, B> matchWeigher) {
@@ -1646,11 +1947,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #penalizeConfigurable(String, ToIntBiFunction)}.
      *
-     * @deprecated Prefer {@link #penalizeConfigurable(ToIntBiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #penalize(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint penalizeConfigurable(String constraintPackage, String constraintName,
@@ -1663,10 +1964,10 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * Negatively impact the {@link Score}: subtract the {@link ConstraintWeight} multiplied by the match weight.
      * Otherwise as defined by {@link #penalizeConfigurable(String)}.
      *
-     * @deprecated Prefer {@link #penalizeConfigurableLong(ToLongBiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #penalizeLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint penalizeConfigurableLong(String constraintName, ToLongBiFunction<A, B> matchWeigher) {
@@ -1677,11 +1978,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #penalizeConfigurableLong(String, ToLongBiFunction)}.
      *
-     * @deprecated Prefer {@link #penalizeConfigurableLong(ToLongBiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #penalizeLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint penalizeConfigurableLong(String constraintPackage, String constraintName,
@@ -1694,10 +1995,10 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * Negatively impact the {@link Score}: subtract the {@link ConstraintWeight} multiplied by the match weight.
      * Otherwise as defined by {@link #penalizeConfigurable(String)}.
      *
-     * @deprecated Prefer {@link #penalizeConfigurableBigDecimal(BiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #penalizeBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint penalizeConfigurableBigDecimal(String constraintName,
@@ -1709,11 +2010,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #penalizeConfigurableBigDecimal(String, BiFunction)}.
      *
-     * @deprecated Prefer {@link #penalizeConfigurableBigDecimal(BiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #penalizeBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint penalizeConfigurableBigDecimal(String constraintPackage, String constraintName,
@@ -1833,10 +2134,10 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * For non-int {@link Score} types use {@link #rewardConfigurableLong(String, ToLongBiFunction)} or
      * {@link #rewardConfigurableBigDecimal(String, BiFunction)} instead.
      *
-     * @deprecated Prefer {@link #rewardConfigurable(ToIntBiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #reward(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint rewardConfigurable(String constraintName, ToIntBiFunction<A, B> matchWeigher) {
@@ -1847,11 +2148,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #rewardConfigurable(String, ToIntBiFunction)}.
      *
-     * @deprecated Prefer {@link #rewardConfigurable(ToIntBiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #reward(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated
     default Constraint rewardConfigurable(String constraintPackage, String constraintName, ToIntBiFunction<A, B> matchWeigher) {
@@ -1863,10 +2164,10 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * Positively impact the {@link Score}: add the {@link ConstraintWeight} multiplied by the match weight.
      * Otherwise as defined by {@link #rewardConfigurable(String)}.
      *
-     * @deprecated Prefer {@link #rewardConfigurableLong(ToLongBiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #rewardLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint rewardConfigurableLong(String constraintName, ToLongBiFunction<A, B> matchWeigher) {
@@ -1877,11 +2178,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #rewardConfigurableLong(String, ToLongBiFunction)}.
      *
-     * @deprecated Prefer {@link #rewardConfigurableLong(ToLongBiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #rewardLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint rewardConfigurableLong(String constraintPackage, String constraintName,
@@ -1894,10 +2195,10 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * Positively impact the {@link Score}: add the {@link ConstraintWeight} multiplied by the match weight.
      * Otherwise as defined by {@link #rewardConfigurable(String)}.
      *
-     * @deprecated Prefer {@link #rewardConfigurableBigDecimal(BiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #rewardBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint rewardConfigurableBigDecimal(String constraintName, BiFunction<A, B, BigDecimal> matchWeigher) {
@@ -1908,11 +2209,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #rewardConfigurableBigDecimal(String, BiFunction)}.
      *
-     * @deprecated Prefer {@link #rewardConfigurableBigDecimal(BiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #rewardBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint rewardConfigurableBigDecimal(String constraintPackage, String constraintName,
@@ -2043,15 +2344,14 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the
      * {@link ConstraintConfiguration}, so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #impact(String, Score)} instead.
      * <p>
      * The {@link ConstraintRef#packageName() constraint package} defaults to
      * {@link ConstraintConfiguration#constraintPackage()}.
      *
-     * @deprecated Prefer {@link #impactConfigurable(ToIntBiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #impact(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint impactConfigurable(String constraintName, ToIntBiFunction<A, B> matchWeigher) {
@@ -2062,11 +2362,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #impactConfigurable(String, ToIntBiFunction)}.
      *
-     * @deprecated Prefer {@link #impactConfigurable(ToIntBiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #impact(Score, ToIntBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint impactConfigurable(String constraintPackage, String constraintName,
@@ -2084,15 +2384,14 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the
      * {@link ConstraintConfiguration}, so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #impact(String, Score)} instead.
      * <p>
      * The {@link ConstraintRef#packageName() constraint package} defaults to
      * {@link ConstraintConfiguration#constraintPackage()}.
      *
-     * @deprecated Prefer {@link #impactConfigurableLong(ToLongBiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #impactLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint impactConfigurableLong(String constraintName, ToLongBiFunction<A, B> matchWeigher) {
@@ -2103,11 +2402,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #impactConfigurableLong(String, ToLongBiFunction)}.
      *
-     * @deprecated Prefer {@link #impactConfigurableLong(ToLongBiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #impactLong(Score, ToLongBiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint impactConfigurableLong(String constraintPackage, String constraintName,
@@ -2125,15 +2424,14 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
      * The constraintWeight comes from an {@link ConstraintWeight} annotated member on the
      * {@link ConstraintConfiguration}, so end users can change the constraint weights dynamically.
      * This constraint may be deactivated if the {@link ConstraintWeight} is zero.
-     * If there is no {@link ConstraintConfiguration}, use {@link #impact(String, Score)} instead.
      * <p>
      * The {@link ConstraintRef#packageName() constraint package} defaults to
      * {@link ConstraintConfiguration#constraintPackage()}.
      *
-     * @deprecated Prefer {@link #impactConfigurableBigDecimal(BiFunction)}.
      * @param constraintName never null, shows up in {@link ConstraintMatchTotal} during score justification
      * @param matchWeigher never null, the result of this function (matchWeight) is multiplied by the constraintWeight
      * @return never null
+     * @deprecated Prefer {@link #impactBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint impactConfigurableBigDecimal(String constraintName,
@@ -2145,11 +2443,11 @@ public interface BiConstraintStream<A, B> extends ConstraintStream {
     /**
      * As defined by {@link #impactConfigurableBigDecimal(String, BiFunction)}.
      *
-     * @deprecated Prefer {@link #impactConfigurableBigDecimal(BiFunction)}.
      * @param constraintPackage never null
      * @param constraintName never null
      * @param matchWeigher never null
      * @return never null
+     * @deprecated Prefer {@link #impactBigDecimal(Score, BiFunction)} and {@link ConstraintWeightOverrides}.
      */
     @Deprecated(forRemoval = true)
     default Constraint impactConfigurableBigDecimal(String constraintPackage, String constraintName,
