@@ -30,7 +30,6 @@ import java.util.SortedMap;
 import java.util.SortedSet;
 
 import ai.timefold.solver.core.api.score.stream.ConstraintCollectors;
-import ai.timefold.solver.core.api.score.stream.common.ConnectedRangeChain;
 import ai.timefold.solver.core.api.score.stream.common.LoadBalance;
 import ai.timefold.solver.core.api.score.stream.tri.TriConstraintCollector;
 import ai.timefold.solver.core.impl.score.stream.collector.AbstractConstraintCollectorsTest;
@@ -820,28 +819,28 @@ final class InnerTriConstraintCollectorsTest extends AbstractConstraintCollector
     @Test
     public void toMapMerged() {
         TriConstraintCollector<Integer, Integer, Integer, ?, Map<Integer, Integer>> collector = ConstraintCollectors
-                .toMap((a, b, c) -> a + b + c, (a, b, c) -> a + b + c, Integer::sum);
+                .toMap((a, b, c) -> a, (a, b, c) -> b + c, Integer::sum);
         Object container = collector.supplier().get();
 
         // Default state.
         assertResult(collector, container, emptyMap());
         // Add first value, we have one now.
         int firstValue = 2;
-        Runnable firstRetractor = accumulate(collector, container, firstValue, 0, 0);
-        assertResult(collector, container, asMap(2, 2));
+        Runnable firstRetractor = accumulate(collector, container, firstValue, 1, 2);
+        assertResult(collector, container, asMap(2, 3));
         // Add second value, we have two now.
         int secondValue = 1;
-        Runnable secondRetractor = accumulate(collector, container, secondValue, 0, 0);
-        assertResult(collector, container, asMap(2, 2, 1, 1));
+        Runnable secondRetractor = accumulate(collector, container, secondValue, 1, 2);
+        assertResult(collector, container, asMap(2, 3, 1, 3));
         // Add third value, same as the second. We now have three values, two of which map to the same key.
-        Runnable thirdRetractor = accumulate(collector, container, secondValue, 0, 0);
-        assertResult(collector, container, asMap(2, 2, 1, 2));
+        Runnable thirdRetractor = accumulate(collector, container, secondValue, 2, 3);
+        assertResult(collector, container, asMap(2, 3, 1, 8));
         // Retract one instance of the second value; we only have two values now.
         secondRetractor.run();
-        assertResult(collector, container, asMap(2, 2, 1, 1));
+        assertResult(collector, container, asMap(2, 3, 1, 5));
         // Retract final instance of the second value; we only have one value now.
         thirdRetractor.run();
-        assertResult(collector, container, asMap(2, 2));
+        assertResult(collector, container, asMap(2, 3));
         // Retract last value; there are no values now.
         firstRetractor.run();
         assertResult(collector, container, emptyMap());
@@ -882,28 +881,28 @@ final class InnerTriConstraintCollectorsTest extends AbstractConstraintCollector
     @Test
     public void toSortedMapMerged() {
         TriConstraintCollector<Integer, Integer, Integer, ?, SortedMap<Integer, Integer>> collector = ConstraintCollectors
-                .toSortedMap((a, b, c) -> a + b + c, (a, b, c) -> a + b + c, Integer::sum);
+                .toSortedMap((a, b, c) -> a, (a, b, c) -> b + c, Integer::sum);
         Object container = collector.supplier().get();
 
         // Default state.
         assertResult(collector, container, emptySortedMap());
         // Add first value, we have one now.
         int firstValue = 2;
-        Runnable firstRetractor = accumulate(collector, container, firstValue, 0, 0);
-        assertResult(collector, container, asSortedMap(2, 2));
+        Runnable firstRetractor = accumulate(collector, container, firstValue, 1, 2);
+        assertResult(collector, container, asSortedMap(2, 3));
         // Add second value, we have two now.
         int secondValue = 1;
-        Runnable secondRetractor = accumulate(collector, container, secondValue, 0, 0);
-        assertResult(collector, container, asSortedMap(2, 2, 1, 1));
+        Runnable secondRetractor = accumulate(collector, container, secondValue, 1, 2);
+        assertResult(collector, container, asSortedMap(2, 3, 1, 3));
         // Add third value, same as the second. We now have three values, two of which map to the same key.
-        Runnable thirdRetractor = accumulate(collector, container, secondValue, 0, 0);
-        assertResult(collector, container, asSortedMap(2, 2, 1, 2));
+        Runnable thirdRetractor = accumulate(collector, container, secondValue, 2, 3);
+        assertResult(collector, container, asSortedMap(2, 3, 1, 8));
         // Retract one instance of the second value; we only have two values now.
         secondRetractor.run();
-        assertResult(collector, container, asSortedMap(2, 2, 1, 1));
+        assertResult(collector, container, asSortedMap(2, 3, 1, 5));
         // Retract final instance of the second value; we only have one value now.
         thirdRetractor.run();
-        assertResult(collector, container, asSortedMap(2, 2));
+        assertResult(collector, container, asSortedMap(2, 3));
         // Retract last value; there are no values now.
         firstRetractor.run();
         assertResult(collector, container, emptySortedMap());
@@ -1076,19 +1075,19 @@ final class InnerTriConstraintCollectorsTest extends AbstractConstraintCollector
     @Override
     @Test
     public void consecutiveUsage() {
-        TriConstraintCollector<Integer, Integer, ?, ?, ConnectedRangeChain<Interval, Integer, Integer>> collector =
-                ConstraintCollectors.toConnectedRanges((a, b, c) -> new Interval(a, b),
+        var collector =
+                ConstraintCollectors.toConnectedRanges((Integer a, Integer b, Object c) -> new Interval(a, b),
                         Interval::start,
                         Interval::end, (a, b) -> b - a);
         var container = collector.supplier().get();
         // Add first value, sequence is [(1,3)]
-        Runnable firstRetractor = accumulate(collector, container, 1, 3, null);
+        var firstRetractor = accumulate(collector, container, 1, 3, null);
         assertResult(collector, container, buildConsecutiveUsage(new Interval(1, 3)));
         // Add second value, sequence is [(1,3),(2,4)]
-        Runnable secondRetractor = accumulate(collector, container, 2, 4, null);
+        var secondRetractor = accumulate(collector, container, 2, 4, null);
         assertResult(collector, container, buildConsecutiveUsage(new Interval(1, 3), new Interval(2, 4)));
         // Add third value, same as the second. Sequence is [{1,1},2}]
-        Runnable thirdRetractor = accumulate(collector, container, 2, 4, null);
+        var thirdRetractor = accumulate(collector, container, 2, 4, null);
         assertResult(collector, container, buildConsecutiveUsage(new Interval(1, 3), new Interval(2, 4), new Interval(2, 4)));
         // Retract one instance of the second value; we only have two values now.
         secondRetractor.run();
@@ -1099,6 +1098,42 @@ final class InnerTriConstraintCollectorsTest extends AbstractConstraintCollector
         // Retract last value; there are no values now.
         firstRetractor.run();
         assertResult(collector, container, buildConsecutiveUsage());
+    }
+
+    @Override
+    @Test
+    public void consecutiveUsageDynamic() {
+        var dynamicCollector =
+                ConstraintCollectors.toConnectedRanges((DynamicInterval a, Object b, Object c) -> a,
+                        DynamicInterval::getStart,
+                        DynamicInterval::getEnd, (a, b) -> b - a);
+
+        var first = new DynamicInterval(0);
+        var second = new DynamicInterval(10);
+        var third = new DynamicInterval(20);
+        var container = dynamicCollector.supplier().get();
+
+        // Add first value, sequence is [[(0, 10)]]
+        var firstRetractor = accumulate(dynamicCollector, container, first, null, null);
+        assertResult(dynamicCollector, container, buildDynamicConsecutiveUsage(new DynamicInterval(0)));
+
+        // Add third value, sequence is [[(0, 10)], [(20, 30)]]
+        accumulate(dynamicCollector, container, third, null, null);
+        assertResult(dynamicCollector, container,
+                buildDynamicConsecutiveUsage(new DynamicInterval(0), new DynamicInterval(20)));
+
+        // Add second value, sequence is [[(0, 10), (10, 20), (20, 30)]]
+        accumulate(dynamicCollector, container, second, null, null);
+        assertResult(dynamicCollector, container,
+                buildDynamicConsecutiveUsage(new DynamicInterval(0), new DynamicInterval(10), new DynamicInterval(20)));
+
+        // Change first value, retract it, then re-add it
+        first.setStart(-5);
+        firstRetractor.run();
+        accumulate(dynamicCollector, container, first, null, null);
+
+        assertResult(dynamicCollector, container,
+                buildDynamicConsecutiveUsage(new DynamicInterval(-5), new DynamicInterval(10), new DynamicInterval(20)));
     }
 
     @Override

@@ -57,7 +57,7 @@ Every upgrade note indicates how likely your code will be affected by that chang
 The upgrade recipe often lists the changes as they apply to Java code.
 We kindly ask Kotlin and Python users to translate the changes accordingly.
 
-=== Upgrade from 1.12.0 to 1.13.0 (Work in progress)
+=== Upgrade from 1.12.0 to 1.13.0
 
 icon:exclamation-triangle[role=red] `@ConstraintConfiguration` deprecated
 [%collapsible%open]
@@ -143,6 +143,31 @@ After in `*ConstraintProvider.java`:
 While constraint packages are still supported, they will be removed in a future major version.
 ====
 
+'''
+
+.icon:info-circle[role=yellow] `ConstraintCollectors.toMap()` now respects the optional merge function
+[%collapsible%open]
+====
+In your constraints, the following code may now behave differently:
+
+[source,java]
+----
+...
+return constraintFactory.forEach(Entity.class)
+    .groupBy(
+        ConstraintCollectors.toMap(
+            entity -> entity.name(),
+            entity -> entity.id(),
+            (entityId1, entityId2) -> Math.max(entityId1, entityId2)
+        )
+    )
+...
+----
+
+The final argument to the mapping collector is now respected,
+where previously it was wrongly ignored under certain conditions.
+This may result in the map being populated differently than before.
+====
 
 === Upgrade from 1.9.0 to 1.10.0
 

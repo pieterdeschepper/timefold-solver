@@ -31,14 +31,11 @@ class Visit:
         field(default=None))
     previous_visit: Annotated[Optional['Visit'], PreviousElementShadowVariable(source_variable_name='visits')] = (
         field(default=None))
-    next_visit: Annotated[Optional['Visit'],
-                          NextElementShadowVariable(source_variable_name='visits')] = field(default=None)
+    next_visit: Annotated[Optional['Visit'], NextElementShadowVariable(source_variable_name='visits')] = field(
+        default=None)
     arrival_time: Annotated[
         Optional[datetime],
-        CascadingUpdateShadowVariable(source_variable_name='previous_visit',
-                                      target_method_name='update_arrival_time'),
-        CascadingUpdateShadowVariable(source_variable_name='vehicle',
-                                      target_method_name='update_arrival_time')] = field(default=None)
+        CascadingUpdateShadowVariable(target_method_name='update_arrival_time')] = field(default=None)
 
     def update_arrival_time(self):
         if self.vehicle is None or (self.previous_visit is not None and self.previous_visit.arrival_time is None):
@@ -140,6 +137,7 @@ def vehicle_routing_constraints(factory: ConstraintFactory):
         minimize_travel_time(factory)
     ]
 
+
 ##############################################
 # Hard constraints
 ##############################################
@@ -161,6 +159,7 @@ def service_finished_after_max_end_time(factory: ConstraintFactory):
                       lambda visit: visit.service_finished_delay_in_minutes())
             .as_constraint('SERVICE_FINISHED_AFTER_MAX_END_TIME')
             )
+
 
 ##############################################
 # Soft constraints
