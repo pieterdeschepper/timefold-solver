@@ -53,6 +53,7 @@ import ai.timefold.solver.core.impl.testdata.domain.extended.TestdataUnannotated
 import ai.timefold.solver.core.impl.testdata.util.PlannerTestUtils;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
@@ -462,6 +463,28 @@ class SolverManagerTest {
     }
 
     @Test
+    @Timeout(60)
+    void testStartJobConsumer() throws ExecutionException, InterruptedException {
+        SolverConfig solverConfig = PlannerTestUtils
+                .buildSolverConfig(TestdataSolution.class, TestdataEntity.class);
+        solverManager = SolverManager
+                .create(solverConfig, new SolverManagerConfig());
+
+        Function<Object, TestdataUnannotatedExtendedSolution> problemFinder = o -> new TestdataUnannotatedExtendedSolution(
+                PlannerTestUtils.generateTestdataSolution("s1"));
+
+        MutableInt started = new MutableInt(0);
+
+        SolverJob<TestdataSolution, Long> solverJob = solverManager.solveBuilder()
+                .withProblemId(1L)
+                .withProblemFinder(problemFinder)
+                .withSolverJobStartedConsumer(solution -> started.increment())
+                .run();
+        solverJob.getFinalBestSolution();
+        assertThat(started.getValue()).isOne();
+    }
+
+    @Test
     void solveWithOverride() {
         // Default spent limit is 1L
         TerminationConfig terminationConfig = new TerminationConfig()
@@ -514,14 +537,18 @@ class SolverManagerTest {
                 .run();
 
         solverJob.getFinalBestSolution();
+        // The score is calculated during the solving starting phase without applying any moves.
+        // This explains why the count has one more unit.
         assertThat(solverJob.getScoreCalculationCount()).isEqualTo(5L);
+        assertThat(solverJob.getMoveEvaluationCount()).isEqualTo(4L);
 
         // Score calculation speed and solve duration are non-deterministic.
         // On an exceptionally fast machine, getSolvingDuration() can return Duration.ZERO.
         // On an exceptionally slow machine, getScoreCalculationSpeed() can be 0 due to flooring
         // (i.e. by taking more than 5 seconds to finish solving).
         assertThat(solverJob.getSolvingDuration()).isGreaterThanOrEqualTo(Duration.ZERO);
-        assertThat(solverJob.getScoreCalculationSpeed()).isGreaterThanOrEqualTo(0L);
+        assertThat(solverJob.getScoreCalculationSpeed()).isNotNegative();
+        assertThat(solverJob.getMoveEvaluationSpeed()).isNotNegative();
     }
 
     @Test

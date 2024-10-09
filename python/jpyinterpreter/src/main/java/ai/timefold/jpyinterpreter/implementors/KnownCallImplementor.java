@@ -120,18 +120,25 @@ public class KnownCallImplementor {
                             Type.getType(PythonLikeObject.class),
                             Type.getType(Class.class)),
                     false);
-            methodVisitor.visitTypeInsn(Opcodes.CHECKCAST,
-                    pythonFunctionSignature.getArgumentSpec().getArgumentTypeInternalName(i));
+            if (i == 0 && pythonFunctionSignature.isClassMethod()) {
+                methodVisitor.visitTypeInsn(Opcodes.CHECKCAST,
+                        Type.getInternalName(PythonLikeType.class));
+            } else {
+                methodVisitor.visitTypeInsn(Opcodes.CHECKCAST,
+                        pythonFunctionSignature.getArgumentSpec().getArgumentTypeInternalName(i));
+            }
         }
 
         // Load any arguments missing values
+        int defaultOffset = pythonFunctionSignature.getArgumentSpec().getTotalArgumentCount()
+                - pythonFunctionSignature.getDefaultArgumentList().size();
         for (int i = specPositionalArgumentCount - missingValues; i < specPositionalArgumentCount; i++) {
             if (pythonFunctionSignature.getArgumentSpec().isArgumentNullable(i)) {
                 methodVisitor.visitInsn(Opcodes.ACONST_NULL);
             } else {
                 methodVisitor.visitFieldInsn(Opcodes.GETSTATIC,
                         pythonFunctionSignature.getDefaultArgumentHolderClassInternalName(),
-                        PythonDefaultArgumentImplementor.getConstantName(i),
+                        PythonDefaultArgumentImplementor.getConstantName(i - defaultOffset),
                         "L" + pythonFunctionSignature.getArgumentSpec().getArgumentTypeInternalName(i) + ";");
             }
         }

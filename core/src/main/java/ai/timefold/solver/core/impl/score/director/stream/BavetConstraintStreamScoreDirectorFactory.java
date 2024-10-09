@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Objects;
 
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.api.score.stream.ConstraintMetaModel;
 import ai.timefold.solver.core.api.score.stream.ConstraintProvider;
 import ai.timefold.solver.core.api.score.stream.ConstraintStreamImplType;
 import ai.timefold.solver.core.config.score.director.ScoreDirectorFactoryConfig;
@@ -13,11 +14,11 @@ import ai.timefold.solver.core.config.solver.EnvironmentMode;
 import ai.timefold.solver.core.config.util.ConfigUtils;
 import ai.timefold.solver.core.enterprise.TimefoldSolverEnterpriseService;
 import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
+import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 import ai.timefold.solver.core.impl.score.stream.bavet.BavetConstraintFactory;
 import ai.timefold.solver.core.impl.score.stream.bavet.BavetConstraintSession;
 import ai.timefold.solver.core.impl.score.stream.bavet.BavetConstraintSessionFactory;
 import ai.timefold.solver.core.impl.score.stream.common.AbstractConstraintStreamScoreDirectorFactory;
-import ai.timefold.solver.core.impl.score.stream.common.ConstraintLibrary;
 import ai.timefold.solver.core.impl.score.stream.common.inliner.AbstractScoreInliner;
 
 public final class BavetConstraintStreamScoreDirectorFactory<Solution_, Score_ extends Score<Score_>>
@@ -55,14 +56,15 @@ public final class BavetConstraintStreamScoreDirectorFactory<Solution_, Score_ e
     }
 
     private final BavetConstraintSessionFactory<Solution_, Score_> constraintSessionFactory;
-    private final ConstraintLibrary<Score_> constraintLibrary;
+    private final ConstraintMetaModel constraintMetaModel;
 
     public BavetConstraintStreamScoreDirectorFactory(SolutionDescriptor<Solution_> solutionDescriptor,
             ConstraintProvider constraintProvider, EnvironmentMode environmentMode) {
         super(solutionDescriptor);
         var constraintFactory = new BavetConstraintFactory<>(solutionDescriptor, environmentMode);
-        constraintLibrary = ConstraintLibrary.of(constraintFactory.buildConstraints(constraintProvider));
-        constraintSessionFactory = new BavetConstraintSessionFactory<>(solutionDescriptor, constraintLibrary);
+        constraintMetaModel =
+                DefaultConstraintMetaModel.of(constraintFactory.buildConstraints(constraintProvider));
+        constraintSessionFactory = new BavetConstraintSessionFactory<>(solutionDescriptor, constraintMetaModel);
     }
 
     @Override
@@ -72,21 +74,29 @@ public final class BavetConstraintStreamScoreDirectorFactory<Solution_, Score_ e
                 expectShadowVariablesInCorrectState);
     }
 
-    public BavetConstraintSession<Score_> newSession(Solution_ workingSolution, boolean constraintMatchEnabled) {
-        return constraintSessionFactory.buildSession(workingSolution, constraintMatchEnabled);
+    @Override
+    public InnerScoreDirector<Solution_, Score_> buildDerivedScoreDirector(boolean lookUpEnabled,
+            boolean constraintMatchEnabledPreference) {
+        return new BavetConstraintStreamScoreDirector<>(this, lookUpEnabled, constraintMatchEnabledPreference,
+                true, true);
+    }
+
+    public BavetConstraintSession<Score_> newSession(Solution_ workingSolution, boolean constraintMatchEnabled,
+            boolean scoreDirectorDerived) {
+        return constraintSessionFactory.buildSession(workingSolution, constraintMatchEnabled, scoreDirectorDerived);
     }
 
     @Override
     public AbstractScoreInliner<Score_> fireAndForget(Object... facts) {
-        var session = newSession(null, true);
+        var session = newSession(null, true, true);
         Arrays.stream(facts).forEach(session::insert);
         session.calculateScore(0);
         return session.getScoreInliner();
     }
 
     @Override
-    public ConstraintLibrary<Score_> getConstraintLibrary() {
-        return constraintLibrary;
+    public ConstraintMetaModel getConstraintMetaModel() {
+        return constraintMetaModel;
     }
 
 }

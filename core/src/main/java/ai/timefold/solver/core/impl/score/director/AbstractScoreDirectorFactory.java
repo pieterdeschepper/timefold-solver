@@ -100,8 +100,8 @@ public abstract class AbstractScoreDirectorFactory<Solution_, Score_ extends Sco
     @Override
     public void assertScoreFromScratch(Solution_ solution) {
         // Get the score before uncorruptedScoreDirector.calculateScore() modifies it
-        Score_ score = (Score_) getSolutionDescriptor().getScore(solution);
-        try (InnerScoreDirector<Solution_, Score_> uncorruptedScoreDirector = buildScoreDirector(false, true)) {
+        Score_ score = getSolutionDescriptor().getScore(solution);
+        try (var uncorruptedScoreDirector = buildDerivedScoreDirector(false, true)) {
             uncorruptedScoreDirector.setWorkingSolution(solution);
             Score_ uncorruptedScore = uncorruptedScoreDirector.calculateScore();
             if (!score.equals(uncorruptedScore)) {
@@ -116,7 +116,7 @@ public abstract class AbstractScoreDirectorFactory<Solution_, Score_ extends Sco
     public void validateEntity(ScoreDirector<Solution_> scoreDirector, Object entity) {
         if (listVariableDescriptor == null) { // Only basic variables.
             var entityDescriptor = solutionDescriptor.findEntityDescriptorOrFail(entity.getClass());
-            if (entityDescriptor.isMovable(scoreDirector, entity)) {
+            if (entityDescriptor.isMovable(scoreDirector.getWorkingSolution(), entity)) {
                 return;
             }
             for (var variableDescriptor : entityDescriptor.getGenuineVariableDescriptorList()) {

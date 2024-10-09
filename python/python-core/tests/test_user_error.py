@@ -1,13 +1,13 @@
+import re
+from dataclasses import dataclass, field
+from typing import Annotated, List
+
+import pytest
 from timefold.solver import *
 from timefold.solver.config import *
 from timefold.solver.domain import *
 from timefold.solver.heuristic import *
 from timefold.solver.score import *
-
-import pytest
-import re
-from typing import Annotated, List
-from dataclasses import dataclass, field
 
 
 @planning_entity
@@ -106,6 +106,30 @@ def test_non_proxied_function_passed():
         )._to_java_solver_config()
 
 
+def test_constraint_construction_failed():
+    import inspect
+    line = inspect.getframeinfo(inspect.stack()[0][0]).lineno + 4
+
+    def bad_constraints(constraint_factory: ConstraintFactory):
+        return [
+            constraint_factory.for_each(BadEntity)
+            .penalize(SimpleScore.ONE)
+            .as_constraint('Penalize each entity')
+        ]
+
+    bad_constraints = constraint_provider(bad_constraints)
+    solver_config = SolverConfig(
+        solution_class=Solution,
+        entity_class_list=[Entity],
+        score_director_factory_config=ScoreDirectorFactoryConfig(
+            constraint_provider_function=bad_constraints
+        )
+    )
+
+    with pytest.raises(RuntimeError, match=re.escape(f'line {line}, in bad_constraints')):
+        SolverFactory.create(solver_config).build_solver()
+
+
 def test_missing_enterprise():
     with pytest.raises(RequiresEnterpriseError, match=re.escape('multithreaded solving')):
         solver_config = SolverConfig(
@@ -120,3 +144,31 @@ def test_missing_enterprise():
         solver_config = SolverConfig(
             nearby_distance_meter_function=my_distance_meter
         )._to_java_solver_config()
+
+
+def test_using_collector_as_group_key():
+    @constraint_provider
+    def bad_constraints(constraint_factory: ConstraintFactory):
+        return [
+            constraint_factory.for_each(Entity)
+            .group_by(lambda entity: ConstraintCollectors.sum(10))
+            .penalize(SimpleScore.ONE)
+            .as_constraint("Minimize overtime")
+        ]
+
+    solver_config = SolverConfig(
+        solution_class=Solution,
+        entity_class_list=[Entity],
+        score_director_factory_config=ScoreDirectorFactoryConfig(
+            constraint_provider_function=bad_constraints
+        ),
+        termination_config=TerminationConfig(
+            score_calculation_count_limit=10
+        )
+    )
+    solver = SolverFactory.create(solver_config).build_solver()
+    problem = Solution([Entity()], ['1', '2', '3'])
+    with pytest.raises(TypeError, match=re.escape(
+            f'A ConstraintCollector should not be used as a key'
+    )):
+        solver.solve(problem)

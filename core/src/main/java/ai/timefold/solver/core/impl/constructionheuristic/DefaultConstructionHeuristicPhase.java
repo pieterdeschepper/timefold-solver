@@ -9,6 +9,8 @@ import ai.timefold.solver.core.impl.phase.AbstractPhase;
 import ai.timefold.solver.core.impl.solver.scope.SolverScope;
 import ai.timefold.solver.core.impl.solver.termination.Termination;
 
+import org.slf4j.event.Level;
+
 /**
  * Default implementation of {@link ConstructionHeuristicPhase}.
  *
@@ -40,7 +42,7 @@ public class DefaultConstructionHeuristicPhase<Solution_> extends AbstractPhase<
     // ************************************************************************
     @Override
     public void solve(SolverScope<Solution_> solverScope) {
-        var phaseScope = new ConstructionHeuristicPhaseScope<>(solverScope, phaseIndex);
+        var phaseScope = buildPhaseScope(solverScope, phaseIndex);
         phaseStarted(phaseScope);
 
         var solutionDescriptor = solverScope.getSolutionDescriptor();
@@ -60,21 +62,22 @@ public class DefaultConstructionHeuristicPhase<Solution_> extends AbstractPhase<
             stepStarted(stepScope);
             decider.decideNextStep(stepScope, placement);
             if (stepScope.getStep() == null) {
-                if (phaseTermination.isPhaseTerminated(phaseScope)
-                        && decider.isLoggingEnabled()
-                        && logger.isTraceEnabled()) {
-                    logger.trace("{}    Step index ({}), time spent ({}) terminated without picking a nextStep.",
-                            logIndentation,
-                            stepScope.getStepIndex(),
-                            stepScope.getPhaseScope().calculateSolverTimeMillisSpentUpToNow());
-                } else if (stepScope.getSelectedMoveCount() == 0L
-                        && decider.isLoggingEnabled()
-                        && logger.isWarnEnabled()) {
-                    logger.warn("{}    No doable selected move at step index ({}), time spent ({})."
-                            + " Terminating phase early.",
-                            logIndentation,
-                            stepScope.getStepIndex(),
-                            stepScope.getPhaseScope().calculateSolverTimeMillisSpentUpToNow());
+                if (phaseTermination.isPhaseTerminated(phaseScope)) {
+                    var logLevel = Level.TRACE;
+                    if (decider.isLoggingEnabled() && logger.isEnabledForLevel(logLevel)) {
+                        logger.atLevel(logLevel).log(
+                                "{}    Step index ({}), time spent ({}) terminated without picking a nextStep.",
+                                logIndentation, stepScope.getStepIndex(),
+                                stepScope.getPhaseScope().calculateSolverTimeMillisSpentUpToNow());
+                    }
+                } else if (stepScope.getSelectedMoveCount() == 0L) {
+                    var logLevel = Level.WARN;
+                    if (decider.isLoggingEnabled() && logger.isEnabledForLevel(logLevel)) {
+                        logger.atLevel(logLevel).log(
+                                "{}    No doable selected move at step index ({}), time spent ({}). Terminating phase early.",
+                                logIndentation, stepScope.getStepIndex(),
+                                stepScope.getPhaseScope().calculateSolverTimeMillisSpentUpToNow());
+                    }
                 } else {
                     throw new IllegalStateException("The step index (" + stepScope.getStepIndex()
                             + ") has selected move count (" + stepScope.getSelectedMoveCount()
@@ -94,14 +97,20 @@ public class DefaultConstructionHeuristicPhase<Solution_> extends AbstractPhase<
         phaseEnded(phaseScope);
     }
 
+    protected ConstructionHeuristicPhaseScope<Solution_> buildPhaseScope(SolverScope<Solution_> solverScope, int phaseIndex) {
+        return new ConstructionHeuristicPhaseScope<>(solverScope, phaseIndex);
+    }
+
     private void doStep(ConstructionHeuristicStepScope<Solution_> stepScope) {
         var step = stepScope.getStep();
         step.doMoveOnly(stepScope.getScoreDirector());
         predictWorkingStepScore(stepScope, step);
-        processWorkingSolutionDuringStep(stepScope);
+        if (!isNested()) {
+            processWorkingSolutionDuringStep(stepScope);
+        }
     }
 
-    protected void processWorkingSolutionDuringStep(ConstructionHeuristicStepScope<Solution_> stepScope) {
+    private void processWorkingSolutionDuringStep(ConstructionHeuristicStepScope<Solution_> stepScope) {
         solver.getBestSolutionRecaller().processWorkingSolutionDuringConstructionHeuristicsStep(stepScope);
     }
 
@@ -147,19 +156,19 @@ public class DefaultConstructionHeuristicPhase<Solution_> extends AbstractPhase<
         phaseScope.endingNow();
         if (decider.isLoggingEnabled() && logger.isInfoEnabled()) {
             logger.info(
-                    "{}Construction Heuristic phase ({}) ended: time spent ({}), best score ({}), score calculation speed ({}/sec), step total ({}).",
+                    "{}Construction Heuristic phase ({}) ended: time spent ({}), best score ({}), move evaluation speed ({}/sec), step total ({}).",
                     logIndentation,
                     phaseIndex,
                     phaseScope.calculateSolverTimeMillisSpentUpToNow(),
                     phaseScope.getBestScore(),
-                    phaseScope.getPhaseScoreCalculationSpeed(),
+                    phaseScope.getPhaseMoveEvaluationSpeed(),
                     phaseScope.getNextStepIndex());
         }
     }
 
-    protected void updateBestSolutionAndFire(ConstructionHeuristicPhaseScope<Solution_> phaseScope) {
-        // Only update the best solution if the CH made any change.
-        if (!phaseScope.getStartingScore().equals(phaseScope.getBestScore())) {
+    private void updateBestSolutionAndFire(ConstructionHeuristicPhaseScope<Solution_> phaseScope) {
+        if (!isNested() && !phaseScope.getStartingScore().equals(phaseScope.getBestScore())) {
+            // Only update the best solution if the CH made any change; nested phases don't update the best solution.
             solver.getBestSolutionRecaller().updateBestSolutionAndFire(phaseScope.getSolverScope());
         }
     }

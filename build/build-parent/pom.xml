@@ -20,10 +20,10 @@
     <!-- ************************************************************************ -->
     <!-- Dependencies -->
     <!-- ************************************************************************ -->
-    <version.ch.qos.logback>1.5.7</version.ch.qos.logback>
-    <version.org.apache.logging.log4j>2.23.1</version.org.apache.logging.log4j>
-    <version.ow2.asm>9.7</version.ow2.asm>
-    <version.io.quarkus>3.13.2</version.io.quarkus>
+    <version.ch.qos.logback>1.5.8</version.ch.qos.logback>
+    <version.org.apache.logging.log4j>2.24.1</version.org.apache.logging.log4j>
+    <version.ow2.asm>9.7.1</version.ow2.asm>
+    <version.io.quarkus>3.15.1</version.io.quarkus>
     <version.org.apache.commons.compress>1.26.1</version.org.apache.commons.compress>
     <version.org.apache.commons.math3>3.6.1</version.org.apache.commons.math3>
     <version.org.apache.commons.text>1.11.0</version.org.apache.commons.text>
@@ -32,9 +32,9 @@
     <version.org.freemarker>2.3.33</version.org.freemarker>
     <version.org.jdom2>2.0.6.1</version.org.jdom2>
     <version.org.jfree.jfreechart>1.5.5</version.org.jfree.jfreechart>
-    <version.org.openrewrite.recipe>2.18.0</version.org.openrewrite.recipe>
+    <version.org.openrewrite.recipe>2.20.0</version.org.openrewrite.recipe>
     <version.org.slf4j>2.0.16</version.org.slf4j><!-- TODO keep in sync with quarkus-bom -->
-    <version.org.springframework.boot>3.3.3</version.org.springframework.boot>
+    <version.org.springframework.boot>3.3.4</version.org.springframework.boot>
     <version.org.webjars.webjars-locator>0.52</version.org.webjars.webjars-locator>
     <version.org.webjars.bootstrap>5.2.3</version.org.webjars.bootstrap>
     <version.org.webjars.jquery>3.6.4</version.org.webjars.jquery>
@@ -55,7 +55,7 @@
     <version.revapi.plugin>0.15.0</version.revapi.plugin>
     <version.sonar.plugin>4.0.0.4121</version.sonar.plugin>
     <version.spotless.plugin>2.43.0</version.spotless.plugin>
-    <version.surefire.plugin>3.5.0</version.surefire.plugin>
+    <version.surefire.plugin>3.5.1</version.surefire.plugin>
     <version.versions.plugin>2.17.1</version.versions.plugin>
 
     <!-- Plugin configuration properties -->
@@ -220,7 +220,7 @@
             <dependency>
               <groupId>org.codehaus.mojo</groupId>
               <artifactId>extra-enforcer-rules</artifactId>
-              <version>1.8.0</version>
+              <version>1.9.0</version>
             </dependency>
           </dependencies>
           <executions>

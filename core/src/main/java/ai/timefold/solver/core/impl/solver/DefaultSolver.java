@@ -96,8 +96,16 @@ public class DefaultSolver<Solution_> extends AbstractSolver<Solution_> {
         return solverScope.getScoreCalculationCount();
     }
 
+    public long getMoveEvaluationCount() {
+        return solverScope.getMoveEvaluationCount();
+    }
+
     public long getScoreCalculationSpeed() {
         return solverScope.getScoreCalculationSpeed();
+    }
+
+    public long getMoveEvaluationSpeed() {
+        return solverScope.getMoveEvaluationSpeed();
     }
 
     @Override
@@ -240,8 +248,7 @@ public class DefaultSolver<Solution_> extends AbstractSolver<Solution_> {
 
     private void registerSolverSpecificMetrics() {
         solverScope.setProblemSizeStatistics(
-                solverScope.getSolutionDescriptor().getProblemSizeStatistics(solverScope.getScoreDirector(),
-                        solverScope.getWorkingSolution()));
+                solverScope.getSolutionDescriptor().getProblemSizeStatistics(solverScope.getWorkingSolution()));
         solverScope.getSolverMetricSet().forEach(solverMetric -> solverMetric.register(this));
     }
 
@@ -250,8 +257,9 @@ public class DefaultSolver<Solution_> extends AbstractSolver<Solution_> {
     }
 
     private void assertCorrectSolutionState() {
-        solverScope.getSolutionDescriptor().visitAllProblemFacts(solverScope.getBestSolution(), this::assertNonNullPlanningId);
-        solverScope.getSolutionDescriptor().visitAllEntities(solverScope.getBestSolution(), entity -> {
+        var bestSolution = solverScope.getBestSolution();
+        solverScope.getSolutionDescriptor().visitAllProblemFacts(bestSolution, this::assertNonNullPlanningId);
+        solverScope.getSolutionDescriptor().visitAllEntities(bestSolution, entity -> {
             assertNonNullPlanningId(entity);
             // Ensure correct state of pinning properties.
             var entityDescriptor = solverScope.getSolutionDescriptor().findEntityDescriptorOrFail(entity.getClass());
@@ -260,7 +268,7 @@ public class DefaultSolver<Solution_> extends AbstractSolver<Solution_> {
             }
             var listVariableDescriptor = entityDescriptor.getGenuineListVariableDescriptor();
             int pinIndex = listVariableDescriptor.getFirstUnpinnedIndex(entity);
-            if (entityDescriptor.isMovable(solverScope.getScoreDirector(), entity)) {
+            if (entityDescriptor.isMovable(solverScope.getScoreDirector().getWorkingSolution(), entity)) {
                 if (pinIndex < 0) {
                     throw new IllegalStateException("The movable planning entity (%s) has a pin index (%s) which is negative."
                             .formatted(entity, pinIndex));
@@ -305,11 +313,11 @@ public class DefaultSolver<Solution_> extends AbstractSolver<Solution_> {
     }
 
     public void outerSolvingEnded(SolverScope<Solution_> solverScope) {
-        logger.info("Solving ended: time spent ({}), best score ({}), score calculation speed ({}/sec), "
+        logger.info("Solving ended: time spent ({}), best score ({}), move evaluation speed ({}/sec), "
                 + "phase total ({}), environment mode ({}), move thread count ({}).",
                 solverScope.getTimeMillisSpent(),
                 solverScope.getBestScore(),
-                solverScope.getScoreCalculationSpeed(),
+                solverScope.getMoveEvaluationSpeed(),
                 phaseList.size(),
                 environmentMode.name(),
                 moveThreadCountDescription);

@@ -2,8 +2,10 @@ package ai.timefold.solver.core.impl.score.stream.common;
 
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.api.score.stream.ConstraintMetaModel;
 import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
 import ai.timefold.solver.core.impl.score.director.AbstractScoreDirectorFactory;
+import ai.timefold.solver.core.impl.score.director.InnerScoreDirector;
 import ai.timefold.solver.core.impl.score.director.ScoreDirectorFactory;
 import ai.timefold.solver.core.impl.score.stream.common.inliner.AbstractScoreInliner;
 
@@ -29,10 +31,15 @@ public abstract class AbstractConstraintStreamScoreDirectorFactory<Solution_, Sc
      */
     public abstract AbstractScoreInliner<Score_> fireAndForget(Object... facts);
 
-    public abstract ConstraintLibrary<Score_> getConstraintLibrary();
+    public abstract ConstraintMetaModel getConstraintMetaModel();
 
     @Override
     public boolean supportsConstraintMatching() {
         return true;
     }
+
+    @Override
+    public abstract InnerScoreDirector<Solution_, Score_> buildDerivedScoreDirector(boolean lookUpEnabled,
+            boolean constraintMatchEnabledPreference);
+
 }

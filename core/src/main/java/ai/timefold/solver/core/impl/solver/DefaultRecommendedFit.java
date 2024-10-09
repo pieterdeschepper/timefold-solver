@@ -4,6 +4,10 @@ import ai.timefold.solver.core.api.score.Score;
 import ai.timefold.solver.core.api.score.analysis.ScoreAnalysis;
 import ai.timefold.solver.core.api.solver.RecommendedFit;
 
+/**
+ * @deprecated Prefer {@link DefaultRecommendedAssignment} instead.
+ */
+@Deprecated(forRemoval = true, since = "1.15.0")
 public record DefaultRecommendedFit<Proposition_, Score_ extends Score<Score_>>(long index, Proposition_ proposition,
         ScoreAnalysis<Score_> scoreAnalysisDiff)
         implements
