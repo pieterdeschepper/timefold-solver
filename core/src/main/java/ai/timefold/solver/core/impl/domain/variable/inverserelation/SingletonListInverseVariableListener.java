@@ -52,18 +52,18 @@ public class SingletonListInverseVariableListener<Solution_>
 
     @Override
     public void afterEntityRemoved(ScoreDirector<Solution_> scoreDirector, Object entity) {
-        var innerScoreDirector = (InnerScoreDirector<Solution_, ?>) scoreDirector;
+        var castScoreDirector = (InnerScoreDirector<Solution_, ?>) scoreDirector;
         for (var element : sourceVariableDescriptor.getValue(entity)) {
-            setInverse(innerScoreDirector, element, null, entity);
+            setInverse(castScoreDirector, element, null, entity);
         }
     }
 
     @Override
     public void afterListVariableElementUnassigned(ScoreDirector<Solution_> scoreDirector, Object element) {
-        var innerScoreDirector = (InnerScoreDirector<Solution_, ?>) scoreDirector;
-        innerScoreDirector.beforeVariableChanged(shadowVariableDescriptor, element);
+        var castScoreDirector = (InnerScoreDirector<Solution_, ?>) scoreDirector;
+        castScoreDirector.beforeVariableChanged(shadowVariableDescriptor, element);
         shadowVariableDescriptor.setValue(element, null);
-        innerScoreDirector.afterVariableChanged(shadowVariableDescriptor, element);
+        castScoreDirector.afterVariableChanged(shadowVariableDescriptor, element);
     }
 
     @Override
@@ -73,14 +73,14 @@ public class SingletonListInverseVariableListener<Solution_>
 
     @Override
     public void afterListVariableChanged(ScoreDirector<Solution_> scoreDirector, Object entity, int fromIndex, int toIndex) {
-        var innerScoreDirector = (InnerScoreDirector<Solution_, ?>) scoreDirector;
+        var castScoreDirector = (InnerScoreDirector<Solution_, ?>) scoreDirector;
         var listVariable = sourceVariableDescriptor.getValue(entity);
         for (var i = fromIndex; i < toIndex; i++) {
             var element = listVariable.get(i);
             if (getInverseSingleton(element) != entity) {
-                innerScoreDirector.beforeVariableChanged(shadowVariableDescriptor, element);
+                castScoreDirector.beforeVariableChanged(shadowVariableDescriptor, element);
                 shadowVariableDescriptor.setValue(element, entity);
-                innerScoreDirector.afterVariableChanged(shadowVariableDescriptor, element);
+                castScoreDirector.afterVariableChanged(shadowVariableDescriptor, element);
             }
         }
     }

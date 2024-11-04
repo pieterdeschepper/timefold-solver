@@ -20,7 +20,7 @@
     <!-- ************************************************************************ -->
     <!-- Dependencies -->
     <!-- ************************************************************************ -->
-    <version.ch.qos.logback>1.5.8</version.ch.qos.logback>
+    <version.ch.qos.logback>1.5.12</version.ch.qos.logback>
     <version.org.apache.logging.log4j>2.24.1</version.org.apache.logging.log4j>
     <version.ow2.asm>9.7.1</version.ow2.asm>
     <version.io.quarkus>3.15.1</version.io.quarkus>
@@ -32,22 +32,23 @@
     <version.org.freemarker>2.3.33</version.org.freemarker>
     <version.org.jdom2>2.0.6.1</version.org.jdom2>
     <version.org.jfree.jfreechart>1.5.5</version.org.jfree.jfreechart>
-    <version.org.openrewrite.recipe>2.20.0</version.org.openrewrite.recipe>
+    <version.org.openrewrite.recipe>2.21.1</version.org.openrewrite.recipe>
     <version.org.slf4j>2.0.16</version.org.slf4j><!-- TODO keep in sync with quarkus-bom -->
-    <version.org.springframework.boot>3.3.4</version.org.springframework.boot>
+    <version.org.springframework.boot>3.3.5</version.org.springframework.boot>
     <version.org.webjars.webjars-locator>0.52</version.org.webjars.webjars-locator>
     <version.org.webjars.bootstrap>5.2.3</version.org.webjars.bootstrap>
     <version.org.webjars.jquery>3.6.4</version.org.webjars.jquery>
+    <version.org.jspecify>1.0.0</version.org.jspecify>
 
     <!-- ************************************************************************ -->
     <!-- Plugins -->
     <!-- ************************************************************************ -->
     <version.antrun.plugin>3.1.0</version.antrun.plugin>
-    <version.asciidoctor.plugin>3.0.0</version.asciidoctor.plugin>
+    <version.asciidoctor.plugin>3.1.0</version.asciidoctor.plugin>
     <version.assembly.plugin>3.7.1</version.assembly.plugin>
     <version.compiler.plugin>3.13.0</version.compiler.plugin>
-    <version.dependency.plugin>3.8.0</version.dependency.plugin>
-    <version.exec.plugin>3.4.1</version.exec.plugin>
+    <version.dependency.plugin>3.8.1</version.dependency.plugin>
+    <version.exec.plugin>3.5.0</version.exec.plugin>
     <version.enforcer.plugin>3.5.0</version.enforcer.plugin>
     <version.jacoco.plugin>0.8.12</version.jacoco.plugin>
     <version.jar.plugin>3.4.2</version.jar.plugin>
@@ -55,7 +56,7 @@
     <version.revapi.plugin>0.15.0</version.revapi.plugin>
     <version.sonar.plugin>4.0.0.4121</version.sonar.plugin>
     <version.spotless.plugin>2.43.0</version.spotless.plugin>
-    <version.surefire.plugin>3.5.1</version.surefire.plugin>
+    <version.surefire.plugin>3.5.2</version.surefire.plugin>
     <version.versions.plugin>2.17.1</version.versions.plugin>
 
     <!-- Plugin configuration properties -->
@@ -134,6 +135,11 @@
         <artifactId>jfreechart</artifactId>
         <version>${version.org.jfree.jfreechart}</version>
       </dependency>
+      <dependency>
+        <groupId>org.jspecify</groupId>
+        <artifactId>jspecify</artifactId>
+        <version>${version.org.jspecify}</version>
+      </dependency>
 
       <!-- ASM -->
       <dependency>
@@ -184,6 +190,8 @@
         <version>${version.org.webjars.jquery}</version>
         <scope>runtime</scope>
       </dependency>
+
+
     </dependencies>
   </dependencyManagement>
 
@@ -422,7 +430,7 @@
               <!-- Required to generate the PDF file -->
               <groupId>org.asciidoctor</groupId>
               <artifactId>asciidoctorj-pdf</artifactId>
-              <version>2.3.18</version>
+              <version>2.3.19</version>
             </dependency>
           </dependencies>
         </plugin>

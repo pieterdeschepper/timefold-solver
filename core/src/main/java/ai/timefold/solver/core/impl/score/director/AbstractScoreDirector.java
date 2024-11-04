@@ -2,6 +2,7 @@ package ai.timefold.solver.core.impl.score.director;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -13,7 +14,9 @@ import java.util.function.Consumer;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.domain.solution.cloner.SolutionCloner;
 import ai.timefold.solver.core.api.domain.variable.VariableListener;
+import ai.timefold.solver.core.api.move.Move;
 import ai.timefold.solver.core.api.score.Score;
+import ai.timefold.solver.core.api.score.analysis.ConstraintAnalysis;
 import ai.timefold.solver.core.api.score.analysis.MatchAnalysis;
 import ai.timefold.solver.core.api.score.director.ScoreDirector;
 import ai.timefold.solver.core.api.solver.change.ProblemChange;
@@ -23,17 +26,20 @@ import ai.timefold.solver.core.impl.domain.entity.descriptor.EntityDescriptor;
 import ai.timefold.solver.core.impl.domain.lookup.LookUpManager;
 import ai.timefold.solver.core.impl.domain.solution.ConstraintWeightSupplier;
 import ai.timefold.solver.core.impl.domain.solution.descriptor.SolutionDescriptor;
+import ai.timefold.solver.core.impl.domain.variable.ListVariableStateSupply;
 import ai.timefold.solver.core.impl.domain.variable.descriptor.ListVariableDescriptor;
 import ai.timefold.solver.core.impl.domain.variable.descriptor.VariableDescriptor;
 import ai.timefold.solver.core.impl.domain.variable.listener.support.VariableListenerSupport;
 import ai.timefold.solver.core.impl.domain.variable.listener.support.violation.SolutionTracker;
 import ai.timefold.solver.core.impl.domain.variable.supply.SupplyManager;
-import ai.timefold.solver.core.impl.heuristic.move.Move;
+import ai.timefold.solver.core.impl.move.director.MoveDirector;
 import ai.timefold.solver.core.impl.phase.scope.SolverLifecyclePoint;
 import ai.timefold.solver.core.impl.score.definition.ScoreDefinition;
 import ai.timefold.solver.core.impl.solver.exception.UndoScoreCorruptionException;
 import ai.timefold.solver.core.impl.solver.thread.ChildThreadType;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +58,7 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
         implements InnerScoreDirector<Solution_, Score_>, Cloneable {
 
     private static final int CONSTRAINT_MATCH_DISPLAY_LIMIT = 8;
-    protected final transient Logger logger = LoggerFactory.getLogger(getClass());
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final boolean lookUpEnabled;
     private final LookUpManager lookUpManager;
@@ -73,6 +79,10 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
     // Null when tracking disabled
     private final boolean trackingWorkingSolution;
     private final SolutionTracker<Solution_> solutionTracker;
+    private final MoveDirector<Solution_> moveDirector = new MoveDirector<>(this);
+
+    // Null when no list variable
+    private final ListVariableStateSupply<Solution_> listVariableStateSupply;
 
     protected AbstractScoreDirector(Factory_ scoreDirectorFactory, boolean lookUpEnabled,
             boolean constraintMatchEnabledPreference, boolean expectShadowVariablesInCorrectState) {
@@ -94,6 +104,12 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
         } else {
             this.solutionTracker = null;
             this.trackingWorkingSolution = false;
+        }
+        var listVariableDescriptor = solutionDescriptor.getListVariableDescriptor();
+        if (listVariableDescriptor == null) {
+            this.listVariableStateSupply = null;
+        } else {
+            this.listVariableStateSupply = getSupplyManager().demand(listVariableDescriptor.getStateDemand());
         }
     }
 
@@ -118,12 +134,23 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
     }
 
     @Override
+    public ListVariableStateSupply<Solution_> getListVariableStateSupply(ListVariableDescriptor<Solution_> variableDescriptor) {
+        var originalListVariableDescriptor = getSolutionDescriptor().getListVariableDescriptor();
+        if (variableDescriptor != originalListVariableDescriptor) {
+            throw new IllegalStateException(
+                    "The variableDescriptor (%s) is not the same as the solution's variableDescriptor (%s)."
+                            .formatted(variableDescriptor, originalListVariableDescriptor));
+        }
+        return Objects.requireNonNull(listVariableStateSupply);
+    }
+
+    @Override
     public boolean expectShadowVariablesInCorrectState() {
         return expectShadowVariablesInCorrectState;
     }
 
     @Override
-    public Solution_ getWorkingSolution() {
+    public @NonNull Solution_ getWorkingSolution() {
         return workingSolution;
     }
 
@@ -164,6 +191,11 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
     @Override
     public SupplyManager getSupplyManager() {
         return variableListenerSupport;
+    }
+
+    @Override
+    public MoveDirector<Solution_> getMoveDirector() {
+        return moveDirector;
     }
 
     // ************************************************************************
@@ -222,20 +254,21 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
         if (trackingWorkingSolution) {
             solutionTracker.setBeforeMoveSolution(workingSolution);
         }
-        Move<Solution_> undoMove = move.doMove(this);
-        Score_ score = calculateScore();
-        if (assertMoveScoreFromScratch) {
-            undoMoveText = undoMove.toString();
-            if (trackingWorkingSolution) {
-                solutionTracker.setAfterMoveSolution(workingSolution);
+        try (var ephemeralMoveDirector = moveDirector.ephemeral()) {
+            move.execute(ephemeralMoveDirector);
+            Score_ score = calculateScore();
+            if (assertMoveScoreFromScratch) {
+                undoMoveText = "Undo(" + move + ")";
+                if (trackingWorkingSolution) {
+                    solutionTracker.setAfterMoveSolution(workingSolution);
+                }
+                assertWorkingScoreFromScratch(score, move);
             }
-            assertWorkingScoreFromScratch(score, move);
+            if (moveProcessor != null) {
+                moveProcessor.accept(score);
+            }
+            return score;
         }
-        if (moveProcessor != null) {
-            moveProcessor.accept(score);
-        }
-        undoMove.doMoveOnly(this);
-        return score;
     }
 
     @Override
@@ -328,6 +361,9 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
         workingInitScore = 0;
         if (lookUpEnabled) {
             lookUpManager.reset();
+        }
+        if (listVariableStateSupply != null) {
+            getSupplyManager().cancel(listVariableStateSupply.getSourceVariableDescriptor().getStateDemand());
         }
         variableListenerSupport.close();
     }
@@ -491,7 +527,7 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
     }
 
     @Override
-    public <E> E lookUpWorkingObject(E externalObject) {
+    public <E> @Nullable E lookUpWorkingObject(@Nullable E externalObject) {
         if (!lookUpEnabled) {
             throw new IllegalStateException("When lookUpEnabled (" + lookUpEnabled
                     + ") is disabled in the constructor, this method should not be called.");
@@ -500,7 +536,7 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
     }
 
     @Override
-    public <E> E lookUpWorkingObjectOrReturnNull(E externalObject) {
+    public <E> @Nullable E lookUpWorkingObjectOrReturnNull(@Nullable E externalObject) {
         if (!lookUpEnabled) {
             throw new IllegalStateException("When lookUpEnabled (" + lookUpEnabled
                     + ") is disabled in the constructor, this method should not be called.");
@@ -692,25 +728,27 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
         var missingSet = new LinkedHashSet<MatchAnalysis<Score_>>();
 
         uncorruptedAnalysis.constraintMap().forEach((constraintRef, uncorruptedConstraintAnalysis) -> {
-            var corruptedConstraintAnalysis = corruptedAnalysis.constraintMap()
-                    .get(constraintRef);
-            if (corruptedConstraintAnalysis == null || corruptedConstraintAnalysis.matches().isEmpty()) {
-                missingSet.addAll(uncorruptedConstraintAnalysis.matches());
-                return;
+            var uncorruptedConstraintMatches = emptyMatchAnalysisIfNull(uncorruptedConstraintAnalysis);
+            var corruptedConstraintMatches = emptyMatchAnalysisIfNull(corruptedAnalysis.constraintMap()
+                    .get(constraintRef));
+            if (corruptedConstraintMatches.isEmpty()) {
+                missingSet.addAll(uncorruptedConstraintMatches);
+            } else {
+                updateExcessAndMissingConstraintMatches(uncorruptedConstraintMatches, corruptedConstraintMatches, excessSet,
+                        missingSet);
             }
-            updateExcessAndMissingConstraintMatches(uncorruptedConstraintAnalysis.matches(),
-                    corruptedConstraintAnalysis.matches(), excessSet, missingSet);
         });
 
         corruptedAnalysis.constraintMap().forEach((constraintRef, corruptedConstraintAnalysis) -> {
-            var uncorruptedConstraintAnalysis = uncorruptedAnalysis.constraintMap()
-                    .get(constraintRef);
-            if (uncorruptedConstraintAnalysis == null || uncorruptedConstraintAnalysis.matches().isEmpty()) {
-                excessSet.addAll(corruptedConstraintAnalysis.matches());
-                return;
+            var corruptedConstraintMatches = emptyMatchAnalysisIfNull(corruptedConstraintAnalysis);
+            var uncorruptedConstraintMatches = emptyMatchAnalysisIfNull(uncorruptedAnalysis.constraintMap()
+                    .get(constraintRef));
+            if (uncorruptedConstraintMatches.isEmpty()) {
+                excessSet.addAll(corruptedConstraintMatches);
+            } else {
+                updateExcessAndMissingConstraintMatches(uncorruptedConstraintMatches, corruptedConstraintMatches, excessSet,
+                        missingSet);
             }
-            updateExcessAndMissingConstraintMatches(uncorruptedConstraintAnalysis.matches(),
-                    corruptedConstraintAnalysis.matches(), excessSet, missingSet);
         });
 
         var analysis = new StringBuilder();
@@ -743,6 +781,14 @@ public abstract class AbstractScoreDirector<Solution_, Score_ extends Score<Scor
             }
         }
         return analysis.toString();
+    }
+
+    private static <Score_ extends Score<Score_>> List<MatchAnalysis<Score_>>
+            emptyMatchAnalysisIfNull(ConstraintAnalysis<Score_> constraintAnalysis) {
+        if (constraintAnalysis == null) {
+            return Collections.emptyList();
+        }
+        return Objects.requireNonNullElse(constraintAnalysis.matches(), Collections.emptyList());
     }
 
     private void appendAnalysis(StringBuilder analysis, String workingLabel, String suffix,

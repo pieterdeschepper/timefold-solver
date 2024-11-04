@@ -4,10 +4,12 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import ai.timefold.solver.core.api.domain.metamodel.ElementLocation;
+import ai.timefold.solver.core.api.domain.metamodel.LocationInList;
 import ai.timefold.solver.core.api.score.director.ScoreDirector;
 import ai.timefold.solver.core.impl.domain.variable.descriptor.ListVariableDescriptor;
-import ai.timefold.solver.core.impl.heuristic.selector.list.ElementLocation;
-import ai.timefold.solver.core.impl.heuristic.selector.list.LocationInList;
+
+import org.jspecify.annotations.NonNull;
 
 final class ExternalizedListVariableStateSupply<Solution_>
         implements ListVariableStateSupply<Solution_> {
@@ -21,7 +23,7 @@ final class ExternalizedListVariableStateSupply<Solution_>
     }
 
     @Override
-    public void resetWorkingSolution(ScoreDirector<Solution_> scoreDirector) {
+    public void resetWorkingSolution(@NonNull ScoreDirector<Solution_> scoreDirector) {
         var workingSolution = scoreDirector.getWorkingSolution();
         if (elementLocationMap == null) {
             elementLocationMap = new IdentityHashMap<>((int) sourceVariableDescriptor.getValueRangeSize(workingSolution, null));
@@ -38,7 +40,7 @@ final class ExternalizedListVariableStateSupply<Solution_>
         var assignedElements = sourceVariableDescriptor.getValue(entity);
         var index = 0;
         for (var element : assignedElements) {
-            var oldLocation = elementLocationMap.put(element, new LocationInList(entity, index));
+            var oldLocation = elementLocationMap.put(element, ElementLocation.of(entity, index));
             if (oldLocation != null) {
                 throw new IllegalStateException(
                         "The supply (%s) is corrupted, because the element (%s) at index (%d) already exists (%s)."
@@ -55,22 +57,22 @@ final class ExternalizedListVariableStateSupply<Solution_>
     }
 
     @Override
-    public void beforeEntityAdded(ScoreDirector<Solution_> scoreDirector, Object o) {
+    public void beforeEntityAdded(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object o) {
         // No need to do anything.
     }
 
     @Override
-    public void afterEntityAdded(ScoreDirector<Solution_> scoreDirector, Object o) {
+    public void afterEntityAdded(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object o) {
         insert(o);
     }
 
     @Override
-    public void beforeEntityRemoved(ScoreDirector<Solution_> scoreDirector, Object o) {
+    public void beforeEntityRemoved(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object o) {
         // No need to do anything.
     }
 
     @Override
-    public void afterEntityRemoved(ScoreDirector<Solution_> scoreDirector, Object o) {
+    public void afterEntityRemoved(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object o) {
         // When the entity is removed, its values become unassigned.
         // An unassigned value has no inverse entity and no index.
         retract(o);
@@ -97,7 +99,7 @@ final class ExternalizedListVariableStateSupply<Solution_>
     }
 
     @Override
-    public void afterListVariableElementUnassigned(ScoreDirector<Solution_> scoreDirector, Object element) {
+    public void afterListVariableElementUnassigned(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object element) {
         var oldLocation = elementLocationMap.remove(element);
         if (oldLocation == null) {
             throw new IllegalStateException(
@@ -108,12 +110,14 @@ final class ExternalizedListVariableStateSupply<Solution_>
     }
 
     @Override
-    public void beforeListVariableChanged(ScoreDirector<Solution_> scoreDirector, Object o, int fromIndex, int toIndex) {
+    public void beforeListVariableChanged(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object o, int fromIndex,
+            int toIndex) {
         // No need to do anything.
     }
 
     @Override
-    public void afterListVariableChanged(ScoreDirector<Solution_> scoreDirector, Object o, int fromIndex, int toIndex) {
+    public void afterListVariableChanged(@NonNull ScoreDirector<Solution_> scoreDirector, @NonNull Object o, int fromIndex,
+            int toIndex) {
         updateIndexes(o, fromIndex, toIndex);
     }
 
@@ -121,7 +125,7 @@ final class ExternalizedListVariableStateSupply<Solution_>
         var assignedElements = sourceVariableDescriptor.getValue(entity);
         for (var index = startIndex; index < assignedElements.size(); index++) {
             var element = assignedElements.get(index);
-            var newLocation = new LocationInList(entity, index);
+            var newLocation = ElementLocation.of(entity, index);
             var oldLocation = elementLocationMap.put(element, newLocation);
             if (oldLocation == null) {
                 unassignedCount--;
